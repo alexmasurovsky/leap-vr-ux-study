@@ -6,6 +6,8 @@ A Leap Motion was fixed to a VR HMD to be used as a hand sensing controller with
 See the PDF of the study report (my Master's thesis) for a full description.
 
 ## Respotiory Contents
+For the full study report, see the file Masurovsky_Thesis.pdf.
+
 The script should be ready to run in R. You may need to adjust the directories listed in the first section. The accompanying R Markdown output file will give a good summary of the code and the analysis steps involved.
 
 ## Questions?
