@@ -42,6 +42,7 @@ library(car)
 library(rstatix)
 library(tinytex)
 library(xtable)
+library(stargazer)
 source("R_rainclouds.R")
 #source("smart_t_test.R")
 
@@ -1280,33 +1281,39 @@ left_join(subject_data_all_wide %>%
 Note: SD's are calculated *per interface (Interface)*, not overall.
 ```{r z_score_clean}
 
-z_flag <- 3.5
+z_flag <- 3
 
 z_accuracy <- subject_data_all_long %>% select(id, Interface, Distance) %>% group_by(Interface) %>%
   mutate(z=(Distance-mean(Distance))/sd(Distance), flag=z > z_flag | z < -1*z_flag, flag_level=z_flag)
+cat("Accuracy")
 table(z_accuracy$flag)
 
 z_grabtime <- subject_data_all_long %>% select(id, Interface, grabtime) %>% group_by(Interface) %>%
   mutate(z=(grabtime-mean(grabtime))/sd(grabtime), flag=z > z_flag | z < -1*z_flag, flag_level=z_flag)
+cat("Grab time")
 table(z_grabtime$flag)
 
 z_releasetime <- subject_data_all_long %>% select(id, Interface, releasetime) %>% group_by(Interface) %>%
   mutate(z=(releasetime-mean(releasetime))/sd(releasetime), flag=z > z_flag | z < -1*z_flag, flag_level=z_flag) 
+cat("Release time")
 table(z_releasetime$flag)
 
 z_totaltime <- subject_data_all_long %>% select(id, Interface, totaltime) %>% group_by(Interface) %>%
   mutate(z=(totaltime-mean(totaltime))/sd(totaltime), flag=z > z_flag | z < -1*z_flag, flag_level=z_flag)
+cat("Total time")
 table(z_totaltime$flag)
 
 z_drops <- subject_data_all_long %>% select(id, Interface, Drop_Count) %>% group_by(Interface) %>%
   mutate(z=(Drop_Count-mean(Drop_Count))/sd(Drop_Count), flag=z > z_flag | z < -1*z_flag, flag_level=z_flag)
+cat("Accidental drops")
 table(z_drops$flag)
 
 z_practice_time <- subject_data_all_long %>% select(id, Interface, practice_time) %>% group_by(Interface) %>%
   mutate(z=(practice_time-mean(practice_time))/sd(practice_time), flag=z > z_flag | z < -1*z_flag, flag_level=z_flag)
+cat("Practice time")
 table(z_practice_time$flag)
 
-
+ggplot(subject_data_all_long, aes(id, totaltime, color=id%in%c(12,30)))+geom_point()+theme(legend.position = "none")+geom_label(data=subject_data_all_long%>%filter(id%in%c(12,30)), aes(label=Interface), nudge_x = 2)+labs(title="Subject Means: Total time", subtite="Subjects 12 and 30 highlighted")
 
 ```
 
@@ -1498,10 +1505,12 @@ leveneTest(Distance ~ Interface, data=subject_data_all_long %>% filter(Interface
 # transform for data output
 stat.test <- stat.test %>% select(-.y., -n1, -n2, -Interface)%>% mutate(p=round(p, 4), p.adj=round(p.adj, 4), effsize=round(effsize, 4))
 
-stat.test.anova <- stat.test.anova %>% mutate(p=round(p, 4))
+#stat.test.anova <- stat.test.anova %>% mutate(p=round(p, 4))
 
 # save for output later
 anova.Interface.distance <- stat.test.anova
+
+
 ttest.Interface.distance <- stat.test
 descriptives.Interface.distance <- subject_data_all_long %>% group_by(Interface) %>% get_summary_stats(Distance) %>% select(Interface, variable, mean, sd, min, max, iqr)
 descriptives.Interface.distance
@@ -1552,7 +1561,7 @@ grabtime_Interface_raincloud
 # transform for data output
 stat.test <- stat.test %>% select(-.y., -n1, -n2, -Interface)%>% mutate(p=round(p, 4), p.adj=round(p.adj, 4), effsize=round(effsize, 4))
 
-stat.test.anova <- stat.test.anova %>% mutate(p=round(p, 4))
+#stat.test.anova <- stat.test.anova %>% mutate(p=round(p, 4))
 
 # save for later
 anova.Interface.grabtime <- stat.test.anova
@@ -1606,7 +1615,7 @@ stat.test.anova
 # transform for data output
 stat.test <- stat.test %>% select(-.y., -n1, -n2, -Interface)%>% mutate(p=round(p, 4), p.adj=round(p.adj, 4), effsize=round(effsize, 4))
 
-stat.test.anova <- stat.test.anova %>% mutate(p=round(p, 4))
+#stat.test.anova <- stat.test.anova %>% mutate(p=round(p, 4))
 
 anova.Interface.releasetime <- stat.test.anova
 ttest.Interface.releasetime <- stat.test
@@ -1658,7 +1667,7 @@ totaltime_Interface_raincloud
 # transform for data output
 stat.test <- stat.test %>% select(-.y., -n1, -n2, -Interface)%>% mutate(p=round(p, 4), p.adj=round(p.adj, 4), effsize=round(effsize, 4))
 
-stat.test.anova <- stat.test.anova %>% mutate(p=round(p, 4))
+#stat.test.anova <- stat.test.anova %>% mutate(p=round(p, 4))
 
 anova.Interface.totaltime <- stat.test.anova
 ttest.Interface.totaltime <- stat.test
@@ -1767,7 +1776,7 @@ describe(diff_set$diff)
 # transform for data output
 stat.test <- stat.test %>% select(-.y., -n1, -n2, -Interface)%>% mutate(p=round(p, 4), p.adj=round(p.adj, 4), effsize=round(effsize, 4))
 
-stat.test.anova <- stat.test.anova %>% mutate(p=round(p, 4))
+#stat.test.anova <- stat.test.anova %>% mutate(p=round(p, 4))
 
 # non-parametric
 stat.test.friedman <- subject_data_all_long %>% friedman_test(Drop_Count ~ Interface | id) %>% mutate(p=round(p, 4))
@@ -2458,11 +2467,26 @@ ggplot(likert_scores %>% filter(question == "agency" | question == "satisfaction
 
 ```{r likert_stat_tests}
 
-# t tests all vs. hhi
-t.tests.likert.all.vs.hhi <- likert_scores %>%
+# t tests likert q's: hhi_leap vs. oculus
+ttests.likert.oculus <- likert_scores %>%
   ungroup(.) %>% group_by(question) %>%
-  pairwise_t_test(score ~ Interface, paired=TRUE, ref.group="HHI_Leap") %>%
-  adjust_pvalue() %>% add_significance(p.col="p.adj", output.col="p.adj.signif", symbols=mysymbols) %>%
+  t_test(score ~ Interface, paired=TRUE, comparisons = list(c("HHI_Leap","Oculus"))) %>%
+  adjust_pvalue() %>% add_significance(p.col="p.adj", output.col="p.adj.signif", symbols=mysymbols)
+
+ttests.likert.leap <- likert_scores %>%
+  ungroup(.) %>% group_by(question) %>%
+  t_test(score ~ Interface, paired=TRUE, comparisons = list(c("HHI_Leap","B_Leap"))) %>%
+  adjust_pvalue() %>% add_significance(p.col="p.adj", output.col="p.adj.signif", symbols=mysymbols)
+
+t.tests.likert.all.vs.hhi <- bind_rows(ttests.likert.oculus, ttests.likert.leap)
+
+# t tests all vs. hhi
+# t.tests.likert.all.vs.hhi <- likert_scores %>%
+#   ungroup(.) %>% group_by(question) %>%
+#   t_test(score ~ Interface, paired=TRUE, ref.group="HHI_Leap") %>%
+#   adjust_pvalue() %>% add_significance(p.col="p.adj", output.col="p.adj.signif", symbols=mysymbols) %>%
+
+t.tests.likert.all.vs.hhi <- bind_rows(ttests.likert.oculus, ttests.likert.leap) %>%
   left_join(likert_scores %>% ungroup(.) %>% cohens_d(score ~ Interface, paired=TRUE, ref.group="HHI_Leap") %>% select(group1, group2, effsize, magnitude), by=c("group1", "group2")) %>%
   mutate(Interface=group1, test="t-test")
 t.tests.likert.all.vs.hhi
@@ -3336,7 +3360,7 @@ sink()
 
 ```
 
-##### TTL - grab time
+##### Learning Curve - grab time
 
 ```{r learning_curve_grab_time}
 
@@ -3376,6 +3400,7 @@ write.csv(anova_summary(aov(TimeFromSpawnToGrab ~ Interface*SpawnOrder + Error(i
 sink()
 
 ```
+##### Learning Curve: Release Time
 
 ```{r learning_curve_release_time}
 # summary(aov(TimeFromGrabToGrabLoss ~ Interface*SpawnOrder + Error(id/(Interface*SpawnOrder)), data=unity_data_downsampled))
@@ -4695,7 +4720,63 @@ cat("\nAuto, not detected by manual: ", accidental_drops_auto_only)
 cat("\nManual, not detected by auto: ", accidental_drops_manual_only)
 
 sink()
+```
 
+```{r output_anovas}
+# output all anovas in one place
+all_performance_anovas <- bind_rows(
+  anova.Interface.distance %>% mutate(Measure="Accuracy") %>% select(Measure, everything()),
+  anova.Interface.totaltime %>% mutate(Measure="Total Time") %>% select(Measure, everything()),
+  anova.Interface.grabtime %>% mutate(Measure="Grab Time") %>% select(Measure, everything()),
+  anova.Interface.releasetime %>% mutate(Measure="Release Time") %>% select(Measure, everything()),
+  anova.Interface.drops %>% mutate(Measure="Accidental Drops") %>% select(Measure, everything())
+) %>% select(-`p<.05`) #%>% mutate(F=round(F,2))#, p="<.001")
+all_performance_anovas[which(all_performance_anovas$p<.0001),"p"] <- "p < .0001"
+all_performance_anovas
+sink("anova_data.csv")
+# then set p values to be "p < .001" if so and remove the *
+cat("ANOVA's: Performance Measures\n")
+write.csv(all_performance_anovas)
+sink()
+
+# output table for LaTeX
+stargazer(all_performance_anovas, summary=FALSE, rownames = FALSE, title="ANOVA Results: Performance Measures")
+
+```
+
+```{r t-test_results}
+
+# output all performance t-tests
+all_performance_ttests_oculus <- bind_rows(
+  subject_data_all_long %>% t_test(Distance ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE),
+  subject_data_all_long %>% t_test(totaltime ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE),
+  subject_data_all_long %>% t_test(grabtime ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE),
+  subject_data_all_long %>% t_test(releasetime ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE),
+  subject_data_all_long %>% t_test(Drop_Count ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE)
+) %>% adjust_pvalue(p.col="p", output.col="p.adj") #%>% select(Measure=`.y.`, t=statistic, df, `p(Holm)`=p.adj)
+all_performance_ttests_oculus
+
+all_performance_ttests_leap <- bind_rows(
+  subject_data_all_long %>% t_test(Distance ~ Interface, comparisons = list(c("HHI_Leap","B_Leap")), paired = TRUE),
+  subject_data_all_long %>% t_test(totaltime ~ Interface, comparisons = list(c("HHI_Leap","B_Leap")), paired = TRUE),
+  subject_data_all_long %>% t_test(grabtime ~ Interface, comparisons = list(c("HHI_Leap","B_Leap")), paired = TRUE),
+  subject_data_all_long %>% t_test(releasetime ~ Interface, comparisons = list(c("HHI_Leap","B_Leap")), paired = TRUE),
+  subject_data_all_long %>% t_test(Drop_Count ~ Interface, comparisons = list(c("HHI_Leap","B_Leap")), paired = TRUE)
+) %>% adjust_pvalue(p.col="p", output.col="p.adj") #%>% select(Measure=`.y.`, t=statistic, df, `p(Holm)`=p.adj)
+all_performance_ttests_leap
+
+# all_performance_anovas[which(all_performance_anovas$p<.0001),"p"] <- "p < .0001"
+# all_performance_anovas
+sink("ttest_data.csv")
+# then set p values to be "p < .001" if so and remove the *
+cat("t-tests: Performance Measures (HHI_Leap and Oculus)\n")
+write.csv(all_performance_ttests_oculus)
+cat("\nt-tests: Performance Measures (HHI_Leap and B_Leap)\n")
+write.csv(all_performance_ttests_leap)
+sink()
+
+# output table for LaTeX
+stargazer(all_performance_anovas, summary=FALSE, rownames = FALSE, title="ANOVA Results: Performance Measures")
 
 ```
 
