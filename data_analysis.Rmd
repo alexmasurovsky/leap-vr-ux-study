@@ -255,7 +255,7 @@ my_file = "collected_unity_data.csv" # confirm filename
 data_set <- read.csv(my_file, numerals = "warn.loss") #, "no.loss"))
 
 data_set <- data_set %>% 
-  select(everything(), -X) %>%
+  select(everything(), -X) %>% 
   rename(Cube_Size=ObjectName,
        Interface=Device,
        InterfaceOrder=DeviceOrder) %>%
@@ -271,6 +271,10 @@ data_set <- data_set %>%
 
 group_names <- c("B_Leap","HHI_Leap","Oculus") # will use this later
 
+# remove duplicates (not sure why these exist)
+trials_original_n <- nrow(data_set)
+data_set <- data_set %>% distinct(.)
+trials_duplicates_removed_n <- nrow(data_set)
 ```
 
 #### Load in accidental drop data
@@ -3144,7 +3148,7 @@ ggsave(last_plot(), filename = "SUS_plot.jpg", width=14, height=8)
 
 ## Post-hoc exploratory
 
-All the good stuff.
+### Time to learn
 
 #### Practice time
 
@@ -3198,6 +3202,224 @@ descriptives.Interface.trainingtime
 
 ```
 
+#### Learning Curve (slope)
+
+```{r downsample}
+
+# What is the lowest number of trials remaining?
+min_n <- unity_data_clean %>% group_by(id, Interface) %>% summarise(n=n()) %>% ungroup %>% summarise(min(n))
+min_n <- min_n[[1]]
+min_n
+
+# # Resample all to that number, but keep order of SpawnOrder
+# unity_data_downsampled <- unity_data_clean %>% group_by(id, Interface) %>% sample_n(min_n) %>%
+# # Change SpawnOrder to 1-20
+# mutate(SpawnOrder=dense_rank(SpawnOrder))
+
+# the problem with resampling is that it is inconsistent, you get a different statistical result each time you downsample. I need a better way.
+
+# Instead of downsampling, just pick first min_n data points
+unity_data_downsampled <- unity_data_clean %>% group_by(id, Interface) %>% 
+  mutate(SpawnOrder=dense_rank(SpawnOrder)) %>% #re-number starting at 1
+  filter(SpawnOrder <= min_n) %>%
+  ungroup %>% mutate(Interface=as.factor(Interface))#, SpawnOrder=as.factor(SpawnOrder))
+
+```
+
+##### Learning curve: Accuracy
+
+```{r learning_curve_accuracy}
+
+# anova to see if there is an effect of SpawnOrder*Interface
+#summary(aov(Distance ~ Interface*SpawnOrder + Error(id/(Interface*SpawnOrder)), data=unity_data_downsampled))
+
+anova_summary(aov(Distance ~ Interface*SpawnOrder + Error(id/(Interface*SpawnOrder)), data=unity_data_downsampled))
+
+# correlation test - do people get more accurate as they go?
+corr_data <- unity_data_downsampled %>% select(SpawnOrder, Distance) %>% arrange(SpawnOrder)
+cor.test(corr_data$SpawnOrder, corr_data$Distance)
+
+# linear regression modeling
+summary(lm(Distance ~ SpawnOrder*Interface, data=unity_data_downsampled))
+#summary(glm(Distance ~ Interface + SpawnOrder + Interface:SpawnOrder, data=unity_data_downsampled))
+
+plot_data <- unity_data_downsampled %>%
+  #filter(TimeFromSpawnToGrabLoss < 15) %>% # get rid of absurd times
+  group_by(Interface, SpawnOrder) %>% summarise(mean=mean(Distance))
+
+learning_curve_accuracy <- ggplot(plot_data, aes(SpawnOrder, mean, color=Interface)) +
+  geom_point()+#geom_line()+
+  geom_smooth(method="lm")+
+  labs(title="Learning Curve: Accuracy")
+learning_curve_accuracy
+
+sink("learning_curve_stat_output.csv")
+cat("ANOVA: Learning Curve: Accuracy")
+write.csv(anova_summary(aov(Distance ~ Interface*SpawnOrder + Error(id/(Interface*SpawnOrder)), data=unity_data_downsampled)))
+sink()
+```
+
+##### Learning Curve: Total time
+```{r learning_curve_total_time}
+
+# anova to see if there is an effect of SpawnOrder*Interface
+#summary(aov(TimeFromSpawnToGrabLoss ~ Interface*SpawnOrder + Error(id/(Interface*SpawnOrder)), data=unity_data_downsampled))
+
+anova_summary(aov(TimeFromSpawnToGrabLoss ~ Interface*SpawnOrder + Error(id/(Interface*SpawnOrder)), data=unity_data_downsampled))
+
+# correlation test - do times get faster as they go?
+corr_data <- unity_data_downsampled %>% select(SpawnOrder, TimeFromSpawnToGrabLoss) %>% arrange(SpawnOrder)
+cor.test(corr_data$SpawnOrder, corr_data$TimeFromSpawnToGrabLoss)
+
+# linear regression modeling
+summary(lm(TimeFromSpawnToGrabLoss ~ SpawnOrder*Interface, data=unity_data_downsampled))
+#summary(glm(Distance ~ Interface + SpawnOrder + Interface:SpawnOrder, data=unity_data_downsampled))
+
+plot_data <- unity_data_downsampled %>%
+  #filter(TimeFromSpawnToGrabLoss < 15) %>% # get rid of absurd times
+  group_by(Interface, SpawnOrder) %>% summarise(mean=mean(TimeFromSpawnToGrabLoss))
+
+learning_curve_total_time <- ggplot(plot_data, aes(SpawnOrder, mean, color=Interface)) +
+  geom_point()+#geom_line()+
+  geom_smooth(method="lm")+labs(title="Learning Curve: Total Time")
+learning_curve_total_time
+
+sink("learning_curve_stat_output.csv", append = TRUE)
+cat("\nANOVA: Learning Curve: Total Time")
+write.csv(anova_summary(aov(TimeFromSpawnToGrabLoss ~ Interface*SpawnOrder + Error(id/(Interface*SpawnOrder)), data=unity_data_downsampled)))
+sink()
+
+#------#------#
+
+# # Bin method: bin into 5 bins --> find means of bins --> use as data points
+# unity_data_downsampled <- unity_data_clean %>% group_by(id, Interface) %>% mutate(bin=ntile(SpawnOrder, 3)) %>%
+#   # transform times into mean of bins
+#   group_by(id, Interface, bin) %>% summarise_at(c("TimeFromSpawnToGrabLoss", "Distance"), mean) %>%
+#       # can use the above for a more general data set using the binning method later
+#   rename(SpawnOrder = bin) # rename for use with ANOVA
+# 
+# # anova to see if there is an effect of SpawnOrder*Interface
+# summary(aov(TimeFromSpawnToGrabLoss ~ Interface*SpawnOrder + Error(id/(Interface*SpawnOrder)), data=unity_data_downsampled))
+# 
+# anova_summary(aov(TimeFromSpawnToGrabLoss ~ Interface*SpawnOrder + Error(id/(Interface*SpawnOrder)), data=unity_data_downsampled))
+# 
+# ggplot(unity_data_downsampled, aes(SpawnOrder, TimeFromSpawnToGrabLoss, color=Interface)) +
+#   geom_point()+#geom_line()+
+#   geom_smooth(method="lm")
+
+# # make a data set of average total time per trial for each interface
+# trial_data_means <- unity_data_downsampled %>%
+#   #filter(TimeFromSpawnToGrabLoss < 15) %>% # get rid of absurd times
+#   group_by(Interface, SpawnOrder) %>% summarise(Total_Time=mean(TimeFromSpawnToGrabLoss))
+# 
+# ggplot(trial_data_means, aes(SpawnOrder, Total_Time, color=Interface)) +
+#   geom_point()+#geom_line()+
+#   geom_smooth(method="lm")
+# 
+# 
+# # only small cubes
+# small_cubes <- unity_data_clean %>% filter(Cube_Size=="Small") %>% 
+#   select(id, Interface, SpawnOrder, Cube_Size, TimeFromSpawnToGrabLoss) 
+#   
+# ggplot(small_cubes %>% filter(Interface=="B_Leap", TimeFromSpawnToGrabLoss<12, id%in%c(1,2,3)),
+#        aes(SpawnOrder, TimeFromSpawnToGrabLoss, color=id))+
+#   geom_point()+geom_line()
+# 
+# # renumber spawnorder to start at 1
+# small_cubes <- small_cubes %>% group_by(Interface, id) %>% mutate(Order=dense_rank(SpawnOrder))
+#   
+#   # filter(SpawnOrder==max(SpawnOrder) | SpawnOrder==min(SpawnOrder)) %>%
+#   # mutate(SpawnOrder=c(1,2))
+# 
+# ggplot(small_cubes %>% filter(Interface=="B_Leap", TimeFromSpawnToGrabLoss < 13, as.integer(id)<10), aes(Order, TimeFromSpawnToGrabLoss, color=id))+
+#   geom_point()+geom_line()
+
+```
+
+##### TTL - grab time
+
+```{r learning_curve_grab_time}
+
+# summary(aov(TimeFromSpawnToGrab ~ Interface*SpawnOrder + Error(id/(Interface*SpawnOrder)), data=unity_data_downsampled))
+
+anova_summary(aov(TimeFromSpawnToGrab ~ Interface*SpawnOrder + Error(id/(Interface*SpawnOrder)), data=unity_data_downsampled))
+
+# correlation test - do times get faster as they go?
+corr_data <- unity_data_downsampled %>% select(SpawnOrder, TimeFromSpawnToGrab) %>% arrange(SpawnOrder)
+cor.test(corr_data$SpawnOrder, corr_data$TimeFromSpawnToGrab)
+  # hhi_leap
+  corr_data <- unity_data_downsampled %>% filter(Interface=="HHI_Leap") %>%
+  select(SpawnOrder, TimeFromSpawnToGrab) %>% arrange(SpawnOrder)
+  cor.test(corr_data$SpawnOrder, corr_data$TimeFromSpawnToGrab)
+  # b_leap
+  corr_data <- unity_data_downsampled %>% filter(Interface=="B_Leap") %>%
+  select(SpawnOrder, TimeFromSpawnToGrab) %>% arrange(SpawnOrder)
+  cor.test(corr_data$SpawnOrder, corr_data$TimeFromSpawnToGrab)
+
+# linear regression modeling
+summary(lm(TimeFromSpawnToGrab ~ SpawnOrder*Interface, data=unity_data_downsampled))
+#summary(glm(Distance ~ Interface + SpawnOrder + Interface:SpawnOrder, data=unity_data_downsampled))
+
+plot_data <- unity_data_downsampled %>%
+  #filter(TimeFromSpawnToGrabLoss < 15) %>% # get rid of absurd times
+  group_by(Interface, SpawnOrder) %>% summarise(mean=mean(TimeFromSpawnToGrab))
+
+learning_curve_grab_time <- ggplot(plot_data, aes(SpawnOrder, mean, color=Interface)) +
+  geom_point()+#geom_line()+
+  geom_smooth(method="lm")+
+  labs(title="Learning Curve: Grab Time")
+learning_curve_grab_time
+
+sink("learning_curve_stat_output.csv", append = TRUE)
+cat("\nANOVA: Learning Curve: Grab Time")
+write.csv(anova_summary(aov(TimeFromSpawnToGrab ~ Interface*SpawnOrder + Error(id/(Interface*SpawnOrder)), data=unity_data_downsampled)))
+sink()
+
+```
+
+```{r learning_curve_release_time}
+# summary(aov(TimeFromGrabToGrabLoss ~ Interface*SpawnOrder + Error(id/(Interface*SpawnOrder)), data=unity_data_downsampled))
+
+anova_summary(aov(TimeFromGrabToGrabLoss ~ Interface*SpawnOrder + Error(id/(Interface*SpawnOrder)), data=unity_data_downsampled))
+
+# correlation test - do times get faster as they go?
+corr_data <- unity_data_downsampled %>% select(SpawnOrder, TimeFromGrabToGrabLoss) %>% arrange(SpawnOrder)
+cor.test(corr_data$SpawnOrder, corr_data$TimeFromGrabToGrabLoss)
+  # how about just for the B_Leap?
+  corr_data <- unity_data_downsampled %>% filter(Interface=="B_Leap") %>%
+    select(SpawnOrder, TimeFromGrabToGrabLoss) %>% arrange(SpawnOrder)
+  cor.test(corr_data$SpawnOrder, corr_data$TimeFromGrabToGrabLoss)
+
+# linear regression modeling
+summary(lm(TimeFromGrabToGrabLoss ~ SpawnOrder*Interface, data=unity_data_downsampled))
+#summary(glm(Distance ~ Interface + SpawnOrder + Interface:SpawnOrder, data=unity_data_downsampled))
+
+plot_data <- unity_data_downsampled %>%
+  #filter(TimeFromSpawnToGrabLoss < 15) %>% # get rid of absurd times
+  group_by(Interface, SpawnOrder) %>% summarise(mean=mean(TimeFromGrabToGrabLoss))
+
+learning_curve_release_time <- ggplot(plot_data, aes(SpawnOrder, mean, color=Interface)) +
+  geom_point()+#geom_line()+
+  geom_smooth(method="lm")+
+  labs(title="Learning Curve: Release Time")
+learning_curve_release_time
+
+sink("learning_curve_stat_output.csv", append = TRUE)
+cat("\nANOVA: Learning Curve: Release Time")
+write.csv(anova_summary(aov(TimeFromGrabToGrabLoss ~ Interface*SpawnOrder + Error(id/(Interface*SpawnOrder)), data=unity_data_downsampled)))
+sink()
+
+```
+
+```{r learning_curve_compilations}
+
+plot_grid(learning_curve_accuracy,# + theme(legend.position = "none"),
+          learning_curve_total_time,# + theme(legend.position = "none"),
+          learning_curve_grab_time,# + theme(legend.position = "none"),
+          learning_curve_release_time)# + theme(legend.position = "none"))
+ggsave("learning_curve_compilation.jpg", width = 12, height=9)
+
+```
 
 ### Interface order
 
