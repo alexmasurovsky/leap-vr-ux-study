@@ -2,16 +2,12 @@
 title: "HHI VR Interface User Test - Data Analysis - R Markdown"
 author: "Alexander Masurovsky"
 date: "7/14/2019"
-output:
+output: 
   pdf_document: 
+    fig_height: 6
+    fig_width: 9
+    highlight: espresso
     toc: yes
-    toc_depth: 4
-    html_document: 
-      df_print: default
-      number_sections: yes
-      toc: yes
-      toc_depth: 4
-      toc_float: yes
 ---
 
 ```{r markdown_setup}
@@ -56,6 +52,9 @@ unity_data_dir <- "~/R/Projects/HHI_Leap_User_Test/Unity_Data"
 survey_data_filename <- "survey_results.xlsx"
 
 # Note: drop count data files stored in Drop_Counting directory
+
+# select subjects to remove for analysis (99 means remove none)
+remove_these_subjects <- 99 # c(12, 30)
 
 ```
 
@@ -826,9 +825,9 @@ Cut and add to accidental drop count:
 
 ```{r clean_unity_data}
 
-#remove_subjects <- c(12) # insert subject numbers seperated by commas here
+remove_subjects <- 99#remove_these_subjects #c(12, 30) # insert subject numbers seperated by commas here
 include <- c(1:sample_size)
-#include <- include[-remove_subjects] # this line removes subjects specified above
+include <- include[-remove_subjects] # this line removes subjects specified above
 
 # remove accidental drops and add to accidental drop count
 # data_set will contain all original drop counts; unity_data_clean will contain updated drops
@@ -1283,6 +1282,10 @@ Note: SD's are calculated *per interface (Interface)*, not overall.
 
 z_flag <- 3
 
+sink("outlier_report.csv")
+
+cat("Flagging number of data points over this many z-scores: ", z_flag, "\n\n")
+
 z_accuracy <- subject_data_all_long %>% select(id, Interface, Distance) %>% group_by(Interface) %>%
   mutate(z=(Distance-mean(Distance))/sd(Distance), flag=z > z_flag | z < -1*z_flag, flag_level=z_flag)
 cat("Accuracy")
@@ -1313,7 +1316,9 @@ z_practice_time <- subject_data_all_long %>% select(id, Interface, practice_time
 cat("Practice time")
 table(z_practice_time$flag)
 
-ggplot(subject_data_all_long, aes(id, totaltime, color=id%in%c(12,30)))+geom_point()+theme(legend.position = "none")+geom_label(data=subject_data_all_long%>%filter(id%in%c(12,30)), aes(label=Interface), nudge_x = 2)+labs(title="Subject Means: Total time", subtite="Subjects 12 and 30 highlighted")
+sink()
+
+ggplot(subject_data_all_long, aes(id, totaltime, color=id%in%c(12,30)))+geom_point()+theme(legend.position = "none")+geom_label(data=subject_data_all_long%>%filter(id%in%c(12,30)), aes(label=Interface), nudge_x = 2)+labs(title="Total time (by subject)", subtite="Subjects 12 and 30 highlighted")
 
 ```
 
@@ -1460,6 +1465,76 @@ gender.group.plot
 - Interaction effect: indicates Interfaces may be better or worse at cubes of different sizes
 
 ### Interface
+
+```{r performance_metrics_main}
+
+# HHI vs. Oculus
+
+Measure=c("Accuracy (m)","Total Time (s)","Grab Time (s)","Release Time (s)","Accidental Drops (#)")
+
+temp_df <- subject_data_all_long %>% ungroup() %>% filter(Interface=="HHI_Leap")
+
+hhi_leap_mean_sd <- #left_join(get_summary_stats(temp_df, Distance,))
+  data.frame(Measure=Measure,
+      HHI_Leap_Mean=c(mean(temp_df$Distance), mean(temp_df$totaltime), mean(temp_df$grabtime), mean(temp_df$releasetime), mean(temp_df$Drop_Count)),
+      HHI_Leap_SD=c(sd(temp_df$Distance), sd(temp_df$totaltime), sd(temp_df$grabtime), sd(temp_df$releasetime), sd(temp_df$Drop_Count))
+             )
+
+temp_df <- subject_data_all_long %>% ungroup() %>% filter(Interface=="Oculus")
+
+oculus_mean_sd <-
+  data.frame(Measure=Measure,
+      Oculus_Mean=c(mean(temp_df$Distance), mean(temp_df$totaltime), mean(temp_df$grabtime), mean(temp_df$releasetime), mean(temp_df$Drop_Count)),
+      Oculus_SD=c(sd(temp_df$Distance), sd(temp_df$totaltime), sd(temp_df$grabtime), sd(temp_df$releasetime), sd(temp_df$Drop_Count))
+             )
+
+hhi_leap_oculus_mean_sd <- left_join(hhi_leap_mean_sd, oculus_mean_sd)
+
+all_performance_ttests_oculus <- bind_rows(
+  subject_data_all_long %>% t_test(Distance ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE),
+  subject_data_all_long %>% t_test(totaltime ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE),
+  subject_data_all_long %>% t_test(grabtime ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE),
+  subject_data_all_long %>% t_test(releasetime ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE),
+  subject_data_all_long %>% t_test(Drop_Count ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE)
+) %>% adjust_pvalue(p.col="p", output.col="p.adj") %>% cbind(Measure) %>% select(Measure, t=statistic, df, `p(Holm)`=p.adj)
+
+performance_ttests_hhi_leap_oculus <- left_join(hhi_leap_oculus_mean_sd, all_performance_ttests_oculus)
+
+# then set p values to be "p < .001" (if true) and remove the *
+performance_ttests_hhi_leap_oculus[which(performance_ttests_hhi_leap_oculus$p<.0001),"p(Holm)"] <- "p < .0001"
+
+
+rm(temp_df, oculus_mean_sd, hhi_leap_oculus_mean_sd, all_performance_ttests_oculus)
+
+stargazer(performance_ttests_hhi_leap_oculus, summary=FALSE, rownames = FALSE, title="Paired Samples t-tests: HHI_Leap and Oculus")
+
+# HHI vs. B_Leap
+
+temp_df <- subject_data_all_long %>% ungroup() %>% filter(Interface=="B_Leap")
+
+b_leap_mean_sd <-
+  data.frame(Measure=Measure,
+      B_Leap_Mean=c(mean(temp_df$Distance), mean(temp_df$totaltime), mean(temp_df$grabtime), mean(temp_df$releasetime), mean(temp_df$Drop_Count)),
+      B_Leap_SD=c(sd(temp_df$Distance), sd(temp_df$totaltime), sd(temp_df$grabtime), sd(temp_df$releasetime), sd(temp_df$Drop_Count))
+             )
+
+hhi_leap_b_leap_mean_sd <- left_join(hhi_leap_mean_sd, b_leap_mean_sd)
+
+all_performance_ttests_b_leap <- bind_rows(
+  subject_data_all_long %>% t_test(Distance ~ Interface, comparisons = list(c("HHI_Leap","B_Leap")), paired = TRUE),
+  subject_data_all_long %>% t_test(totaltime ~ Interface, comparisons = list(c("HHI_Leap","B_Leap")), paired = TRUE),
+  subject_data_all_long %>% t_test(grabtime ~ Interface, comparisons = list(c("HHI_Leap","B_Leap")), paired = TRUE),
+  subject_data_all_long %>% t_test(releasetime ~ Interface, comparisons = list(c("HHI_Leap","B_Leap")), paired = TRUE),
+  subject_data_all_long %>% t_test(Drop_Count ~ Interface, comparisons = list(c("HHI_Leap","B_Leap")), paired = TRUE)
+) %>% adjust_pvalue(p.col="p", output.col="p.adj") %>% cbind(Measure) %>% select(Measure, t=statistic, df, `p(Holm)`=p.adj) %>% mutate(t=-1*t)
+
+performance_ttests_hhi_leap_b_leap <- left_join(hhi_leap_b_leap_mean_sd, all_performance_ttests_b_leap)
+
+rm(temp_df, hhi_leap_b_leap_mean_sd, b_leap_mean_sd, hhi_leap_mean_sd, all_performance_ttests_b_leap)
+
+stargazer(performance_ttests_hhi_leap_b_leap, summary=FALSE, rownames = FALSE)
+
+```
 
 #### Accuracy
 
@@ -1779,10 +1854,10 @@ stat.test <- stat.test %>% select(-.y., -n1, -n2, -Interface)%>% mutate(p=round(
 #stat.test.anova <- stat.test.anova %>% mutate(p=round(p, 4))
 
 # non-parametric
-stat.test.friedman <- subject_data_all_long %>% friedman_test(Drop_Count ~ Interface | id) %>% mutate(p=round(p, 4))
-stat.test.wilcox <- subject_data_all_long %>% wilcox_test(Drop_Count ~ Interface, paired=TRUE)
-stat.test.friedman
-stat.test.wilcox
+# stat.test.friedman <- subject_data_all_long %>% friedman_test(Drop_Count ~ Interface | id) %>% mutate(p=round(p, 4))
+# stat.test.wilcox <- subject_data_all_long %>% wilcox_test(Drop_Count ~ Interface, paired=TRUE)
+# stat.test.friedman
+# stat.test.wilcox
 
 anova.Interface.drops <- stat.test.anova
 ttest.Interface.drops <- stat.test
@@ -2476,9 +2551,14 @@ ttests.likert.oculus <- likert_scores %>%
 ttests.likert.leap <- likert_scores %>%
   ungroup(.) %>% group_by(question) %>%
   t_test(score ~ Interface, paired=TRUE, comparisons = list(c("HHI_Leap","B_Leap"))) %>%
-  adjust_pvalue() %>% add_significance(p.col="p.adj", output.col="p.adj.signif", symbols=mysymbols)
+  adjust_pvalue() %>% add_significance(p.col="p.adj", output.col="p.adj.signif", symbols=mysymbols) %>%
+  mutate(group1="HHI_Leap", group2="B_Leap", statistic=-1*statistic)
 
 t.tests.likert.all.vs.hhi <- bind_rows(ttests.likert.oculus, ttests.likert.leap)
+
+sink("subjective_stats.csv")
+write.csv(t.tests.likert.all.vs.hhi)
+sink()
 
 # t tests all vs. hhi
 # t.tests.likert.all.vs.hhi <- likert_scores %>%
@@ -2837,7 +2917,7 @@ ggsave("likert_naturalness_main.jpg", width=8, height=12)
 
 #### Difference Scores & Plots
 
-```{r subjective_diff_scores}
+```{r subjective_diff_scores, eval=FALSE}
 
 myquestions = c("satisfaction", "recommend", "agency", "natural", "intuitive", "releasing",  "gripping", "precise", "tiring", "comfortable")
 
@@ -2886,7 +2966,7 @@ ggplot(diff_scores_vs_leap %>% filter(question != "agency", question != "satisfa
   scale_y_continuous(limits=c(-2,2))+
   scale_color_manual(values=c("black", "orange"))+
   #scale_color_brewer(palette="Paired")+
-  stat_pvalue_manual(data=t.tests.likert.all.vs.hhi %>% filter(question != "agency", question != "satisfaction", group2=="B_Leap"), x="question", label = "p.adj.signif", step.increase=.1, y.position=-2, size=star_size)+
+  #stat_pvalue_manual(data=t.tests.likert.all.vs.hhi %>% filter(question != "agency", question != "satisfaction", group2=="B_Leap"), x="question", label = "p.adj.signif", step.increase=.1, y.position=-2, size=star_size)+
   geom_hline(yintercept=0, linetype=2)+
   geom_label(aes(x=8.3, y=-1, label="B_Leap"), fill=mycolors[1], alpha=.4, color="white", size=likert_interface_lab)+
   geom_label(aes(x=8.3, y=1.2, label="HHI Leap"), fill=mycolors[2], alpha=.4,color="white", size=likert_interface_lab)
@@ -4731,10 +4811,10 @@ all_performance_anovas <- bind_rows(
   anova.Interface.releasetime %>% mutate(Measure="Release Time") %>% select(Measure, everything()),
   anova.Interface.drops %>% mutate(Measure="Accidental Drops") %>% select(Measure, everything())
 ) %>% select(-`p<.05`) #%>% mutate(F=round(F,2))#, p="<.001")
+# then set p values to be "p < .001" (if true) and remove the *
 all_performance_anovas[which(all_performance_anovas$p<.0001),"p"] <- "p < .0001"
 all_performance_anovas
 sink("anova_data.csv")
-# then set p values to be "p < .001" if so and remove the *
 cat("ANOVA's: Performance Measures\n")
 write.csv(all_performance_anovas)
 sink()
@@ -4746,6 +4826,8 @@ stargazer(all_performance_anovas, summary=FALSE, rownames = FALSE, title="ANOVA 
 
 ```{r t-test_results}
 
+Measure=c("Accuracy (Distance)","Total Time","Grab Time","Release Time","Accidental Drops")
+
 # output all performance t-tests
 all_performance_ttests_oculus <- bind_rows(
   subject_data_all_long %>% t_test(Distance ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE),
@@ -4753,7 +4835,7 @@ all_performance_ttests_oculus <- bind_rows(
   subject_data_all_long %>% t_test(grabtime ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE),
   subject_data_all_long %>% t_test(releasetime ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE),
   subject_data_all_long %>% t_test(Drop_Count ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE)
-) %>% adjust_pvalue(p.col="p", output.col="p.adj") #%>% select(Measure=`.y.`, t=statistic, df, `p(Holm)`=p.adj)
+) %>% adjust_pvalue(p.col="p", output.col="p.adj") %>% cbind(Measure) %>% select(Measure, t=statistic, df, p, `p(Holm)`=p.adj)
 all_performance_ttests_oculus
 
 all_performance_ttests_leap <- bind_rows(
@@ -4762,13 +4844,11 @@ all_performance_ttests_leap <- bind_rows(
   subject_data_all_long %>% t_test(grabtime ~ Interface, comparisons = list(c("HHI_Leap","B_Leap")), paired = TRUE),
   subject_data_all_long %>% t_test(releasetime ~ Interface, comparisons = list(c("HHI_Leap","B_Leap")), paired = TRUE),
   subject_data_all_long %>% t_test(Drop_Count ~ Interface, comparisons = list(c("HHI_Leap","B_Leap")), paired = TRUE)
-) %>% adjust_pvalue(p.col="p", output.col="p.adj") #%>% select(Measure=`.y.`, t=statistic, df, `p(Holm)`=p.adj)
+) %>% adjust_pvalue(p.col="p", output.col="p.adj") %>% mutate(statistic=-1*statistic) %>% select(Measure=`.y.`, t=statistic, df, p, `p(Holm)`=p.adj)
 all_performance_ttests_leap
 
-# all_performance_anovas[which(all_performance_anovas$p<.0001),"p"] <- "p < .0001"
-# all_performance_anovas
+# out put to file
 sink("ttest_data.csv")
-# then set p values to be "p < .001" if so and remove the *
 cat("t-tests: Performance Measures (HHI_Leap and Oculus)\n")
 write.csv(all_performance_ttests_oculus)
 cat("\nt-tests: Performance Measures (HHI_Leap and B_Leap)\n")
@@ -4776,7 +4856,9 @@ write.csv(all_performance_ttests_leap)
 sink()
 
 # output table for LaTeX
-stargazer(all_performance_anovas, summary=FALSE, rownames = FALSE, title="ANOVA Results: Performance Measures")
+stargazer(all_performance_ttests %>%
+            select(-p) %>%
+            mutate(`p(Holm)`=round(`p(Holm)`, 3), t=round(t, 3)), summary=FALSE, rownames = FALSE, title="ANOVA Results: Performance Measures")
 
 ```
 
