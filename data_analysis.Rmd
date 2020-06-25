@@ -67,7 +67,8 @@ theme_set(theme_cowplot())
 plot_order <- c("B_Leap","HHI_Leap","Oculus")
 
 # colors
-mycolors=c("darkorange","forestgreen","blue")
+#mycolors=c("darkorange","forestgreen","blue")
+mycolors=c("grey","forestgreen","black")
 #mycolors=c("mediumseagreen", "pink3", "black")
 #mycolors=c("mediumseagreen", "thistle3", "black")
 mysmoothing=1.5
@@ -75,7 +76,7 @@ myalpha=.3
 
 # text sizes
 title_size <- 30
-axis_text_size <- 20
+axis_text_size <- 17
 legend_title_size <- 10
 legend_text_size <- 10
 legend_pos <- "none"
@@ -2635,6 +2636,70 @@ anova.likert <-
 
 
 #### Likert Plots
+
+```{r subjective_plots}
+
+myquestions = c("satisfaction", "recommend", "agency", "natural", "intuitive", "releasing",  "gripping", "precise", "tiring", "comfortable")
+
+subjective_means <- likert_scores %>% group_by(Interface, question) %>% get_summary_stats(show=c("mean","sd","se")) %>% mutate(ci=1.96*se) %>% ungroup() %>% mutate(question=factor(question, levels=myquestions))
+subjective_means[which(subjective_means$question %in% c("agency","satisfaction")),"scale"] <- "7pt"
+subjective_means[which(not(subjective_means$question %in% c("agency","satisfaction"))),"scale"] <- "5pt"
+
+#View(subjective_means)
+
+# classify above or below avg.
+
+ggplot(subjective_means %>% filter(scale=="5pt"), aes(question, mean, color=Interface, fill=Interface))+
+  theme_minimal()+
+  geom_pointrange(aes(ymin=mean-ci, ymax=mean+ci), position=position_dodge(width=.5))+
+  #geom_bar(stat="identity", position="dodge", alpha=myalpha)+
+  #geom_errorbar(aes(ymin=mean-ci, ymax=mean+ci), position="dodge", show.legend = FALSE)+
+  scale_color_manual(values=mycolors)+#, guide_legend(title="Interface", reverse = FALSE))+
+  scale_fill_manual(values=mycolors)+#, guide_legend(title="Interface", reverse=FALSE))+
+  coord_flip()+
+  theme(legend.position="bottom", axis.text = element_text(size=likert_lab_size), plot.title = element_text(size=likert_title_size), axis.title = element_text(size=likert_lab_size))+
+  scale_y_continuous(limits=c(1,5))+
+  #theme(strip.text.y = element_text(angle=0))+
+  geom_hline(aes(yintercept = 3), linetype=2)+
+  labs(title="Subjective Questionnaire Scores", y="Response (Mean)", x="")
+
+ggplot(subjective_means %>% filter(scale=="5pt"), aes(question, mean, color=Interface, fill=Interface))+
+  #geom_pointrange(aes(ymin=mean-ci, ymax=mean+ci), position=position_dodge(width=.5))+
+  geom_bar(stat="identity", position="dodge", alpha=myalpha)+
+  geom_errorbar(aes(ymin=mean-ci, ymax=mean+ci), position="dodge", show.legend = FALSE)+
+  scale_color_manual(values=mycolors, guide_legend(title="Interface", reverse = TRUE))+
+  scale_fill_manual(values=mycolors, guide_legend(title="Interface", reverse=TRUE))+
+  coord_flip()+
+  #scale_y_continuous(breaks=c(1:5), labels = c(1,2,3,4,5))+
+  #theme(strip.text.y = element_text(angle=0))+
+  geom_hline(aes(yintercept = 3), linetype=2)+
+  labs(title="Subjective Questionnaire Scores")#+facet_grid(question ~ ., scales="free_x")#+facet_grid(scale ~ .)
+
+# ggplot(subjective_means, aes(Interface, mean, color=Interface, fill=Interface))+
+#   geom_bar(stat="identity", position="dodge", alpha=myalpha)+
+#   geom_errorbar(aes(ymin=mean-ci, ymax=mean+ci), position="dodge", show.legend = FALSE)+
+#   scale_color_manual(values=mycolors, guide_legend(title="Interface", reverse = TRUE))+
+#   scale_fill_manual(values=mycolors, guide_legend(title="Interface", reverse=TRUE))+
+#   coord_flip()+
+#   labs(title="Subjective Questionnaire Scores")+
+#   facet_grid(vars(question), scales="free", space="free")+#+facet_grid(scale ~ .)
+#   theme(strip.text.y = element_text(angle=0))
+
+
+# temp_plot_data <- subject_data_all_long %>%
+#     select(id, PrefCondition) %>% ungroup(.) %>% distinct(.) %>%
+#     count(PrefCondition) %>% mutate(PrefCondition=factor(PrefCondition, levels=c("B_Leap","HHI_Leap","Oculus")))
+#   # make bar plot of counts
+# preferred_plot <- ggplot(temp_plot_data, aes(PrefCondition, n, fill=PrefCondition, color=PrefCondition))+
+#     geom_bar(stat="identity", alpha=myalpha, width=.6)+
+#     scale_fill_manual(values=mycolors)+scale_color_manual(values=mycolors)+
+#     geom_label(aes(label=n), position=position_nudge(y=-2), color="white")+
+#     guides(fill=FALSE, color=FALSE)+labs(x="", y="Count")+theme_cowplot()+
+#     ggtitle("Overall preferred interface")+
+#     theme(plot.title = element_text(size=title_size*.6), axis.title = element_text(size=axis_text_size))
+# preferred_plot
+
+```
 
 Dot plots, density distribution, means and CI's with a middle score indicated by a dotted line.
 Note: Using the R commind "adjust=" to smooth density plots (otherwise they would show divets in between points on the Likert scale). Adjustment is set by "mysmoothing" variable near the top of this code block.
