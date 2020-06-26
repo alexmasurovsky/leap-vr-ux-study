@@ -67,8 +67,9 @@ theme_set(theme_cowplot())
 plot_order <- c("B_Leap","HHI_Leap","Oculus")
 
 # colors
+mycolors=c("grey","blue","darkorange") # colorblind safe (I think)
 #mycolors=c("darkorange","forestgreen","blue")
-mycolors=c("grey","forestgreen","black")
+#mycolors=c("grey","forestgreen","black")
 #mycolors=c("mediumseagreen", "pink3", "black")
 #mycolors=c("mediumseagreen", "thistle3", "black")
 mysmoothing=1.5
@@ -986,9 +987,9 @@ plot_grid(totaltime_box, totaltime_density, totaltime_clean_box, totaltime_clean
 ```
 Visual inspection of the density plots suggests that the density (and related measures such as the median) converge between the 3 Interfaces. The grand mean (grey line) gets noticably lower after the clean.
 
-## Data compilations
+## Data sets for further analysis
 
-These comipilations will contain the *means*, not the individual trials.
+These comipilations will contain the *subject means*, not the individual trials.
 
 ### Cube size data
 
@@ -1467,6 +1468,8 @@ gender.group.plot
 
 ### Interface
 
+#### All Performance t-tests
+Here I re-did the t-tests that follow this section, but all in one place. Then I apply the Holm correction to all 5 tests per each interface, where as before I was applying it to 2 tests (2 interfaces per each of the 5 measures). The previous application resulted in the Holm correction essentially not being applied to the comparisons between the HHI_Leap and the B_Leap.
 ```{r performance_metrics_main}
 
 # HHI vs. Oculus
@@ -1491,6 +1494,9 @@ oculus_mean_sd <-
 
 hhi_leap_oculus_mean_sd <- left_join(hhi_leap_mean_sd, oculus_mean_sd)
 
+# Construct a data frame with all t-tests HHI_Leap vs. Oculus.
+# Then apply the Holm adjustment at the end with the adjust_pvalue() function from rstatix
+# (Holm is the default type of correction)
 all_performance_ttests_oculus <- bind_rows(
   subject_data_all_long %>% t_test(Distance ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE),
   subject_data_all_long %>% t_test(totaltime ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE),
@@ -2552,8 +2558,7 @@ ttests.likert.oculus <- likert_scores %>%
 ttests.likert.leap <- likert_scores %>%
   ungroup(.) %>% group_by(question) %>%
   t_test(score ~ Interface, paired=TRUE, comparisons = list(c("HHI_Leap","B_Leap"))) %>%
-  adjust_pvalue() %>% add_significance(p.col="p.adj", output.col="p.adj.signif", symbols=mysymbols) %>%
-  mutate(group1="HHI_Leap", group2="B_Leap", statistic=-1*statistic)
+  adjust_pvalue() %>% add_significance(p.col="p.adj", output.col="p.adj.signif", symbols=mysymbols) %>% mutate(group1="HHI_Leap", group2="B_Leap", statistic=-1*statistic)
 
 t.tests.likert.all.vs.hhi <- bind_rows(ttests.likert.oculus, ttests.likert.leap)
 
@@ -2640,16 +2645,42 @@ anova.likert <-
 ```{r subjective_plots}
 
 myquestions = c("satisfaction", "recommend", "agency", "natural", "intuitive", "releasing",  "gripping", "precise", "tiring", "comfortable")
+question_labels=c("Satisfaction", "Recommend", "Agency", "Natural", "Intuitive", "Releasing",  "Gripping", "Precise", "Tiring", "Comfortable")
 
-subjective_means <- likert_scores %>% group_by(Interface, question) %>% get_summary_stats(show=c("mean","sd","se")) %>% mutate(ci=1.96*se) %>% ungroup() %>% mutate(question=factor(question, levels=myquestions))
-subjective_means[which(subjective_means$question %in% c("agency","satisfaction")),"scale"] <- "7pt"
-subjective_means[which(not(subjective_means$question %in% c("agency","satisfaction"))),"scale"] <- "5pt"
+subjective_means <- likert_scores %>% group_by(Interface, question) %>% get_summary_stats(show=c("mean","sd","se")) %>% mutate(ci=1.96*se) %>% ungroup() %>%
+  mutate(question=factor(question, levels=myquestions, labels=question_labels))
+
+subjective_means[which(subjective_means$question %in% c("Agency","Satisfaction")),"scale"] <- "7pt"
+subjective_means[which(not(subjective_means$question %in% c("Agency","Satisfaction"))),"scale"] <- "5pt"
+
+# View(left_join(subjective_means, t.tests.likert.all.vs.hhi %>% mutate(question=factor(question, levels=myquestions, labels=question_labels)) %>% select(Interface, question, `p.adj`), by=c("Interface", "question")))
+
+for (i in 1:nrow(subjective_means)){
+  if (subjective_means[i,"scale"]=="7pt"){subjective_means[i,"converted_score"] <- subjective_means[i,"mean"]-4} else-if (subjective_means[i,"scale"]=="5pt"){subjective_means[i,"converted_score"] <- subjective_means[i,"mean"]-3}
+}
 
 #View(subjective_means)
 
 # classify above or below avg.
 
-ggplot(subjective_means %>% filter(scale=="5pt"), aes(question, mean, color=Interface, fill=Interface))+
+# ggplot(subjective_means %>% filter(scale=="5pt"), aes(question, converted_score, color=Interface, fill=Interface))+
+#   theme_minimal()+
+#   geom_pointrange(aes(ymin=converted_score-ci, ymax=converted_score+ci), position=position_dodge(width=.5))+
+#   #geom_point(data=likert_scores %>% mutate(question=factor(question, levels=myquestions, labels=question_labels)) %>% filter(not(question %in% c("Agency","Satisfaction"))), aes(question, score), size=.25, position=position_jitter(width=.1, height=.1))+
+#   #geom_bar(stat="identity", position="dodge", alpha=myalpha)+
+#   #geom_errorbar(aes(ymin=mean-ci, ymax=mean+ci), position="dodge", show.legend = FALSE)+
+#   scale_color_manual(values=mycolors)+#, guide_legend(title="Interface", reverse = FALSE))+
+#   scale_fill_manual(values=mycolors)+#, guide_legend(title="Interface", reverse=FALSE))+
+#   coord_flip()+
+#   theme(legend.position="bottom")+#, axis.text = element_text(size=likert_lab_size), plot.title = element_text(size=likert_title_size), axis.title = element_text(size=likert_lab_size))+
+#   scale_y_continuous(limits=c(-2,2))+
+#   #scale_x_discrete(position = "top")+
+#   #theme(strip.text.y = element_text(angle=0))+
+#   geom_hline(aes(yintercept = 0), linetype=2)+
+#   labs(title="Subjective Questionnaire Scores", y="Response (Mean)", x="")
+# ggsave("subjective_scores_new.jpg")
+
+ggplot(subjective_means %>% filter(question=="Agency"), aes(question, mean, color=Interface, fill=Interface))+
   theme_minimal()+
   geom_pointrange(aes(ymin=mean-ci, ymax=mean+ci), position=position_dodge(width=.5))+
   #geom_bar(stat="identity", position="dodge", alpha=myalpha)+
@@ -2658,49 +2689,108 @@ ggplot(subjective_means %>% filter(scale=="5pt"), aes(question, mean, color=Inte
   scale_fill_manual(values=mycolors)+#, guide_legend(title="Interface", reverse=FALSE))+
   coord_flip()+
   theme(legend.position="bottom", axis.text = element_text(size=likert_lab_size), plot.title = element_text(size=likert_title_size), axis.title = element_text(size=likert_lab_size))+
-  scale_y_continuous(limits=c(1,5))+
+  scale_y_continuous(limits=c(1,7), breaks=c(1:7))+
   #theme(strip.text.y = element_text(angle=0))+
-  geom_hline(aes(yintercept = 3), linetype=2)+
+  geom_hline(aes(yintercept = 4), linetype=2)+
   labs(title="Subjective Questionnaire Scores", y="Response (Mean)", x="")
+ggsave("subjective_scores_agency_new.jpg")
 
-ggplot(subjective_means %>% filter(scale=="5pt"), aes(question, mean, color=Interface, fill=Interface))+
-  #geom_pointrange(aes(ymin=mean-ci, ymax=mean+ci), position=position_dodge(width=.5))+
+# ggplot(subjective_means %>% filter(question=="Satisfaction"), aes(question, mean, color=Interface, fill=Interface))+
+#   theme_minimal()+
+#   geom_pointrange(aes(ymin=mean-ci, ymax=mean+ci), position=position_dodge(width=.5))+
+#   #geom_bar(stat="identity", position="dodge", alpha=myalpha)+
+#   #geom_errorbar(aes(ymin=mean-ci, ymax=mean+ci), position="dodge", show.legend = FALSE)+
+#   scale_color_manual(values=mycolors)+#, guide_legend(title="Interface", reverse = FALSE))+
+#   scale_fill_manual(values=mycolors)+#, guide_legend(title="Interface", reverse=FALSE))+
+#   coord_flip()+
+#   theme(legend.position="bottom", axis.text = element_text(size=likert_lab_size), plot.title = element_text(size=likert_title_size), axis.title = element_text(size=likert_lab_size))+
+#   scale_y_continuous(limits=c(1,7), breaks=c(1:7))+
+#   #theme(strip.text.y = element_text(angle=0))+
+#   geom_hline(aes(yintercept = 4), linetype=2)+
+#   labs(title="Subjective Questionnaire Scores", y="Response (Mean)", x="")
+# #ggsave("subjective_scores_satisfaction_new.jpg")
+
+# ggplot(subjective_means %>% filter(scale=="5pt"), aes(question, converted_score, color=Interface, fill=Interface))+
+#   geom_bar(stat="identity", position="dodge", alpha=myalpha)+
+#   geom_errorbar(aes(ymin=converted_score-ci, ymax=converted_score+ci), position=position_dodge(width=.9), width=.3, show.legend = FALSE)+
+#   scale_color_manual(values=mycolors, guide_legend(title="Interface", reverse = TRUE))+
+#   scale_fill_manual(values=mycolors, guide_legend(title="Interface", reverse=TRUE))+
+#   scale_y_continuous(limits = c(-2,3))+
+#   coord_flip()+
+#   stat_pvalue_manual(data=t.tests.likert.all.vs.hhi %>% mutate(question=factor(question, levels=myquestions, labels=question_labels)) %>% filter(question != "Agency", question != "Satisfaction"), x="question", label = "p.adj.signif", step.increase=.1, y.position=-2, size=star_size)+
+#   scale_y_continuous(breaks=c(-2:3), limits=(c(-2,2)))+#labels = c(-2,-1,0,1,2,3))+
+#   theme(legend.position = "bottom")+# strip.text.y = element_text(angle=0))+
+#   geom_hline(aes(yintercept = 0), linetype=2)+
+#   labs(title="Subjective Questionnaire Scores")#+facet_grid(question ~ .)
+
+# good old fashioned bar chart
+ggplot(subjective_means %>% mutate(question=fct_rev(question)) %>% filter(scale=="5pt"), aes(Interface, converted_score, color=Interface, fill=Interface))+
+  #theme_minimal()+
   geom_bar(stat="identity", position="dodge", alpha=myalpha)+
-  geom_errorbar(aes(ymin=mean-ci, ymax=mean+ci), position="dodge", show.legend = FALSE)+
+  geom_errorbar(aes(ymin=converted_score-ci, ymax=converted_score+ci), position=position_dodge(width=.9), width=.3, show.legend = FALSE)+
   scale_color_manual(values=mycolors, guide_legend(title="Interface", reverse = TRUE))+
   scale_fill_manual(values=mycolors, guide_legend(title="Interface", reverse=TRUE))+
   coord_flip()+
-  #scale_y_continuous(breaks=c(1:5), labels = c(1,2,3,4,5))+
-  #theme(strip.text.y = element_text(angle=0))+
-  geom_hline(aes(yintercept = 3), linetype=2)+
-  labs(title="Subjective Questionnaire Scores")#+facet_grid(question ~ ., scales="free_x")#+facet_grid(scale ~ .)
+  stat_pvalue_manual(data=t.tests.likert.all.vs.hhi %>% mutate(question=factor(question, levels=myquestions, labels=question_labels), p.adj=round(p.adj, 3), y.position=1.9) %>% filter(question != "Agency", question != "Satisfaction"), x="group1", label = "p.adj.signif", step.increase=.1, size=5)+#y.position=statistic
+  scale_y_continuous(breaks=c(-2:3), limits=(c(-2,2)))+#labels = c(-2,-1,0,1,2,3))+
+  theme(legend.position = "left",  axis.text.y = element_blank(), axis.line.y=element_blank(), axis.ticks.y=element_blank(), strip.text.y = element_text(angle=0))+
+  geom_hline(aes(yintercept = 0), linetype=2)+
+  labs(title="Subjective Question Scores", y="Mean Likert-scale Rating", x=NULL)+
+  guides(fill = guide_legend(reverse = TRUE), color=guide_legend(reverse=TRUE))+
+  facet_grid(question ~ .)
+ggsave("subjective_questions_new_bar.jpg")
 
-# ggplot(subjective_means, aes(Interface, mean, color=Interface, fill=Interface))+
-#   geom_bar(stat="identity", position="dodge", alpha=myalpha)+
-#   geom_errorbar(aes(ymin=mean-ci, ymax=mean+ci), position="dodge", show.legend = FALSE)+
-#   scale_color_manual(values=mycolors, guide_legend(title="Interface", reverse = TRUE))+
-#   scale_fill_manual(values=mycolors, guide_legend(title="Interface", reverse=TRUE))+
-#   coord_flip()+
-#   labs(title="Subjective Questionnaire Scores")+
-#   facet_grid(vars(question), scales="free", space="free")+#+facet_grid(scale ~ .)
-#   theme(strip.text.y = element_text(angle=0))
+ggplot(subjective_means %>% filter(question=="Agency"), aes(Interface, converted_score, color=Interface, fill=Interface))+
+  #theme_minimal()+
+  geom_bar(stat="identity", position="dodge", alpha=myalpha, width=.4)+
+  geom_errorbar(aes(ymin=converted_score-ci, ymax=converted_score+ci), position=position_dodge(width=.9), width=.1, show.legend = FALSE)+
+  scale_color_manual(values=mycolors, guide_legend(title="Interface", reverse = TRUE))+
+  scale_fill_manual(values=mycolors, guide_legend(title="Interface", reverse=TRUE))+
+  coord_flip()+
+  stat_pvalue_manual(data=t.tests.likert.all.vs.hhi %>% mutate(question=factor(question, levels=myquestions, labels=question_labels), p.adj=paste0("p(Holm) = ", round(p.adj, 3)), y.position=2.9) %>% filter(question == "Agency"), label = "p.adj", step.increase=.1, size=5)+#y.position=statistic
+  scale_y_continuous(breaks=c(-3:3), limits=(c(-3,4)))+#labels = c(-2,-1,0,1,2,3))+
+  theme(legend.position = "left",  axis.text.y = element_blank(), axis.line.y=element_blank(), axis.ticks.y=element_blank(), strip.text.y = element_text(angle=0))+
+  geom_hline(aes(yintercept = 0), linetype=2)+
+  labs(title="Subjective Question Scores: Agency", y="Mean Likert-scale Rating", x=NULL)+
+  guides(fill = guide_legend(reverse = TRUE), color=guide_legend(reverse=TRUE))#+facet_grid(question ~ .)
+ggsave("subjective_questions_new_bar_agency.jpg")
+
+ggplot(subjective_means %>% filter(question=="Satisfaction"), aes(Interface, converted_score, color=Interface, fill=Interface))+
+  #theme_minimal()+
+  geom_bar(stat="identity", position="dodge", alpha=myalpha, width=.4)+
+  geom_errorbar(aes(ymin=converted_score-ci, ymax=converted_score+ci), position=position_dodge(width=.9), width=.1, show.legend = FALSE)+
+  scale_color_manual(values=mycolors, guide_legend(title="Interface", reverse = TRUE))+
+  scale_fill_manual(values=mycolors, guide_legend(title="Interface", reverse=TRUE))+
+  coord_flip()+
+  stat_pvalue_manual(data=t.tests.likert.all.vs.hhi %>% mutate(question=factor(question, levels=myquestions, labels=question_labels), p.adj=paste0("p(Holm) = ",round(p.adj, 3)), y.position=2.9) %>% filter(question == "Satisfaction"), label = "p.adj", step.increase=.1, size=5)+#y.position=statistic
+  scale_y_continuous(breaks=c(-3:3), limits=(c(-3,4)))+#labels = c(-2,-1,0,1,2,3))+
+  theme(legend.position = "left",  axis.text.y = element_blank(), axis.line.y=element_blank(), axis.ticks.y=element_blank(), strip.text.y = element_text(angle=0))+
+  geom_hline(aes(yintercept = 0), linetype=2)+
+  labs(title="Subjective Question Scores: Overall Satisfaction", y="Mean Likert-scale Rating", x=NULL)+
+  guides(fill = guide_legend(reverse = TRUE), color=guide_legend(reverse=TRUE))#+facet_grid(question ~ .)
+ggsave("subjective_questions_new_bar_satisfaction.jpg")
+
+# pointrange version
+ggplot(subjective_means %>% mutate(question=fct_rev(question)) %>% filter(scale=="5pt"), aes(Interface, converted_score, color=Interface, fill=Interface))+
+  #theme_minimal()+  
+  geom_pointrange(aes(ymin=converted_score-ci, ymax=converted_score+ci), position=position_dodge(width=.5))+
+  scale_color_manual(values=mycolors, guide_legend(title="Interface", reverse = TRUE))+
+  scale_fill_manual(values=mycolors, guide_legend(title="Interface", reverse=TRUE))+
+  coord_flip()+
+  stat_pvalue_manual(data=t.tests.likert.all.vs.hhi %>% mutate(question=factor(question, levels=myquestions, labels=question_labels), p.adj=round(p.adj, 3), y.position=1.9) %>% filter(question != "Agency", question != "Satisfaction"), x="group1", label = "p.adj.signif", step.increase=.1, size=5)+#y.position=statistic
+  scale_y_continuous(breaks=c(-2:3), limits=(c(-2,2)))+#labels = c(-2,-1,0,1,2,3))+
+  theme(legend.position = "left", axis.text.y = element_blank(), axis.line.y=element_blank(), axis.ticks.y=element_blank(), strip.text.y = element_text(angle=0))+
+  geom_hline(aes(yintercept = 0), linetype=2)+
+  labs(title="Subjective Question Scores", y="Mean Likert-scale Rating", x=NULL)+
+  guides(fill = guide_legend(reverse = TRUE), color=guide_legend(reverse=TRUE))+
+  facet_grid(question ~ .)
+ggsave("subjective_questions_new_point.jpg")
 
 
-# temp_plot_data <- subject_data_all_long %>%
-#     select(id, PrefCondition) %>% ungroup(.) %>% distinct(.) %>%
-#     count(PrefCondition) %>% mutate(PrefCondition=factor(PrefCondition, levels=c("B_Leap","HHI_Leap","Oculus")))
-#   # make bar plot of counts
-# preferred_plot <- ggplot(temp_plot_data, aes(PrefCondition, n, fill=PrefCondition, color=PrefCondition))+
-#     geom_bar(stat="identity", alpha=myalpha, width=.6)+
-#     scale_fill_manual(values=mycolors)+scale_color_manual(values=mycolors)+
-#     geom_label(aes(label=n), position=position_nudge(y=-2), color="white")+
-#     guides(fill=FALSE, color=FALSE)+labs(x="", y="Count")+theme_cowplot()+
-#     ggtitle("Overall preferred interface")+
-#     theme(plot.title = element_text(size=title_size*.6), axis.title = element_text(size=axis_text_size))
-# preferred_plot
 
 ```
 
+### Raincloud plots
 Dot plots, density distribution, means and CI's with a middle score indicated by a dotted line.
 Note: Using the R commind "adjust=" to smooth density plots (otherwise they would show divets in between points on the Likert scale). Adjustment is set by "mysmoothing" variable near the top of this code block.
 
