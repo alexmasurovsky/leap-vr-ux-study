@@ -6,7 +6,6 @@ output:
   pdf_document: 
     fig_height: 6
     fig_width: 9
-    highlight: espresso
     toc: yes
 ---
 
@@ -39,6 +38,7 @@ library(rstatix)
 library(tinytex)
 library(xtable)
 library(stargazer)
+library("TOSTER")
 source("R_rainclouds.R")
 #source("smart_t_test.R")
 
@@ -67,7 +67,7 @@ theme_set(theme_cowplot())
 plot_order <- c("B_Leap","HHI_Leap","Oculus")
 
 # colors
-mycolors=c("grey","blue","darkorange") # colorblind safe (I think)
+mycolors=c("darkgrey","blue","darkorange") # colorblind safe (I think)
 #mycolors=c("darkorange","forestgreen","blue")
 #mycolors=c("grey","forestgreen","black")
 #mycolors=c("mediumseagreen", "pink3", "black")
@@ -77,7 +77,7 @@ myalpha=.3
 
 # text sizes
 title_size <- 30
-axis_text_size <- 17
+axis_text_size <- 30
 legend_title_size <- 10
 legend_text_size <- 10
 legend_pos <- "none"
@@ -1601,7 +1601,31 @@ oculus_diffs <- data.frame(Difference=round(temp_plot_data$mean[1]/temp_plot_dat
                            Type = "Ratio", row.names="Accuracy", stringsAsFactors = FALSE)
 oculus_diffs["Accuracy","cohen's d"] <- round(stat.test[3,"effsize"], 3)
 
+# equivalence: HHI Leap and B_Leap
 
+# find correlation of dependent variable between HHI Leap and B_Leap
+r_val <- cor.test(
+  x = subject_data_all_long[which(subject_data_all_long$Interface=="HHI_Leap"),"Distance"],
+  y = subject_data_all_long[which(subject_data_all_long$Interface=="B_Leap"),"Distance"],
+  method = "pearson",
+  alternative = "two.sided"
+  )
+r_val <- r_val$estimate[[1]]
+
+TOSTaccuracy <- TOSTpaired(n=32,
+  m1 = descriptives.Interface.distance[which(descriptives.Interface.distance$Interface=="HHI_Leap"),"mean"][[1]],
+  m2 = descriptives.Interface.distance[which(descriptives.Interface.distance$Interface=="B_Leap"),"mean"][[1]],
+  sd1 = descriptives.Interface.distance[which(descriptives.Interface.distance$Interface=="HHI_Leap"),"sd"][[1]],
+  sd2 = descriptives.Interface.distance[which(descriptives.Interface.distance$Interface=="B_Leap"),"sd"][[1]],
+  r12 = r_val,
+  low_eqbound_dz = -.3,
+  high_eqbound_dz = .3,
+  alpha = .05,
+  plot= TRUE,
+  verbose = TRUE
+)
+
+TOSTaccuracy
 ```
 
 #### Grab time
@@ -1626,15 +1650,15 @@ stat.test.anova
   #raincloud grabtime
   grabtime_Interface_raincloud <- ggplot(subject_data_all_long,aes(x=Interface, y=grabtime, fill = Interface, colour = Interface))+
     geom_flat_violin(position = position_nudge(x = .25, y = 0),  alpha=myalpha, adjust = mysmoothing)+
-    geom_point(position = position_jitter(width = .15), size = .25)+
-    geom_point(data = temp_plot_data, aes(x = Interface, y = mean), position = position_nudge(.25), colour = "BLACK")+
-geom_label(data=temp_plot_data, aes(Interface, mean, label=round(mean,2)), alpha=1, position=position_nudge(.5), color="white", label.size=.2)+
-    geom_errorbar(data = temp_plot_data, aes(x = Interface, y = mean, ymin=mean-(se*1.96), ymax=mean+(se*1.96)), position = position_nudge(.25), colour = "BLACK", width = 0.05, size = 0.8)+
-    ylab('Time (seconds)')+xlab('Interface')+theme_cowplot()+guides(fill = FALSE, colour = FALSE)+#coord_flip()+
+    geom_point(position = position_jitter(width = .15), size = 3)+
+    geom_point(data = temp_plot_data, aes(x = Interface, y = mean), position = position_nudge(.25), colour = "BLACK", size=3)+
+    geom_errorbar(data = temp_plot_data, aes(x = Interface, y = mean, ymin=mean-(se*1.96), ymax=mean+(se*1.96)), position = position_nudge(.25), colour = "BLACK", width = 0.05, size = 1.3)+
+geom_label(data=temp_plot_data, aes(Interface, mean, label=round(mean,2)), alpha=1, position=position_nudge(.5), color="white", size=8)+
+    ylab('Time (seconds)')+xlab('')+theme_cowplot()+guides(fill = FALSE, colour = FALSE)+#coord_flip()+
     scale_color_manual(values=mycolors)+#scale_colour_brewer(palette = "Set2")+
     scale_fill_manual(values=mycolors)+#scale_fill_brewer(palette = "Set2", direction=1)+
     labs(title="Grab time")+
-    stat_pvalue_manual(data=stat.test %>% filter(p.adj < 0.05), xmin="group1", xmax="group2", label = "p.adj.signif", step.increase=.1, y.position=2*max(temp_plot_data$mean), position=position_nudge(.25))+
+    stat_pvalue_manual(data=stat.test %>% filter(p.adj < 0.05), xmin="group1", xmax="group2", label = "p.adj.signif", step.increase=.1, y.position=2*max(temp_plot_data$mean), position=position_nudge(.25), size=10, bracket.size = .5)+
     theme(plot.title = element_text(size=title_size), axis.title = element_text(size=axis_text_size), axis.text = element_text(size=axis_text_size*.75))
 grabtime_Interface_raincloud
   ggsave("grabtime_plot_main.jpg", width=10, height=7)
@@ -1654,7 +1678,26 @@ oculus_diffs["Grab time","Difference"] <- round(temp_plot_data$mean[1]/temp_plot
 oculus_diffs["Grab time","Type"] <- "Ratio"
 oculus_diffs["Grab time","cohen's d"] <- round(stat.test[3,"effsize"], 3)
 
+r_val <- cor.test(
+  x = subject_data_all_long[which(subject_data_all_long$Interface=="HHI_Leap"),"grabtime"],
+  y = subject_data_all_long[which(subject_data_all_long$Interface=="B_Leap"),"grabtime"],
+  method = "pearson",
+  alternative = "two.sided"
+  )
+r_val <- r_val$estimate[[1]]
 
+# TOSTpaired(n=32,
+#   m1 = descriptives.Interface.grabtime[which(descriptives.Interface.grabtime$Interface=="HHI_Leap"),"mean"][[1]],
+#   m2 = descriptives.Interface.grabtime[which(descriptives.Interface.grabtime$Interface=="B_Leap"),"mean"][[1]],
+#   sd1 = descriptives.Interface.grabtime[which(descriptives.Interface.grabtime$Interface=="HHI_Leap"),"sd"][[1]],
+#   sd2 = descriptives.Interface.grabtime[which(descriptives.Interface.grabtime$Interface=="B_Leap"),"sd"][[1]],
+#   r12 = r_val,
+#   low_eqbound_dz = -.3,
+#   high_eqbound_dz = .3,
+#   alpha = .05,
+#   plot= TRUE,
+#   verbose = TRUE
+# )
 ```
 
 #### Release time
@@ -1679,16 +1722,16 @@ stat.test.anova
 #raincloud releasetime
   releasetime_Interface_raincloud <- ggplot(subject_data_all_long,aes(x=Interface,y=releasetime, fill = Interface, colour = Interface))+
     geom_flat_violin(position = position_nudge(x = .25, y = 0), alpha=myalpha, adjust = mysmoothing)+
-    geom_point(position = position_jitter(width = .15), size = .25)+
-    geom_point(data = temp_plot_data, aes(x = Interface, y = mean), position = position_nudge(.25), colour = "BLACK")+
+    geom_point(position = position_jitter(width = .15), size = 3)+
+    geom_point(data = temp_plot_data, aes(x = Interface, y = mean), position = position_nudge(.25), colour = "BLACK", size=3)+
     #stat_compare_means(comparisons=list(c("B_Leap", "HHI_Leap"), c("HHI_Leap", "Oculus"), c("B_Leap", "Oculus")), method="t.test", paired=TRUE, label="p.signif")+
-    geom_label(data=temp_plot_data, aes(Interface, mean, label=round(mean,2)), alpha=1, position=position_nudge(.5), color="white", label.size=.2)+
-    geom_errorbar(data = temp_plot_data, aes(x = Interface, y = mean, ymin=mean-(se*1.96), ymax=mean+(se*1.96)), position = position_nudge(.25), colour = "BLACK", width = 0.05, size = 0.8)+
-    ylab('Time (seconds)')+xlab('Interface')+theme_cowplot()+guides(fill = FALSE, colour = FALSE) +
+    geom_label(data=temp_plot_data, aes(Interface, mean, label=round(mean,2)), alpha=1, position=position_nudge(.5), color="white", size=8)+
+    geom_errorbar(data = temp_plot_data, aes(x = Interface, y = mean, ymin=mean-(se*1.96), ymax=mean+(se*1.96)), position = position_nudge(.25), colour = "BLACK", width = 0.05, size = 1.3)+
+    ylab('Time (seconds)')+xlab('')+theme_cowplot()+guides(fill = FALSE, colour = FALSE) +
     scale_color_manual(values=mycolors)+#scale_colour_brewer(palette = "Set2")+
     scale_fill_manual(values=mycolors)+#scale_fill_brewer(palette = "Set2", direction=1)+
     labs(title="Release time")+
-    stat_pvalue_manual(data=stat.test %>% filter(p.adj < 0.05), xmin="group1", xmax="group2", label = "p.adj.signif", step.increase=.1, y.position=max(subject_data_all_long$releasetime), position=position_nudge(.25))+
+    stat_pvalue_manual(data=stat.test %>% filter(p.adj < 0.05), xmin="group1", xmax="group2", label = "p.adj.signif", step.increase=.1, y.position=.85*max(subject_data_all_long$releasetime), position=position_nudge(.25), size=10, bracket.size = .5)+
     theme(plot.title = element_text(size=title_size), axis.title = element_text(size=axis_text_size), axis.text = element_text(size=axis_text_size*.75))
   releasetime_Interface_raincloud
     ggsave("releasetime_plot_main.jpg", width=10, height=7)
@@ -1769,11 +1812,31 @@ Interface.order.anova2 <-
   anova_summary(effect.size="pes",aov(totaltime ~ Interface*Leap_Group + Error(id/Interface), data=subject_data_all_long%>%ungroup%>%filter(Interface=="B_Leap" | Interface=="HHI_Leap")))
 Interface.order.anova2
 
+r_val <- cor.test(
+  x = subject_data_all_long[which(subject_data_all_long$Interface=="HHI_Leap"),"totaltime"],
+  y = subject_data_all_long[which(subject_data_all_long$Interface=="B_Leap"),"totaltime"],
+  method = "pearson",
+  alternative = "two.sided"
+  )
+r_val <- r_val$estimate[[1]]
+
+TOSTpaired(n=32,
+  m1 = descriptives.Interface.totaltime[which(descriptives.Interface.totaltime$Interface=="HHI_Leap"),"mean"][[1]],
+  m2 = descriptives.Interface.totaltime[which(descriptives.Interface.totaltime$Interface=="B_Leap"),"mean"][[1]],
+  sd1 = descriptives.Interface.totaltime[which(descriptives.Interface.totaltime$Interface=="HHI_Leap"),"sd"][[1]],
+  sd2 = descriptives.Interface.totaltime[which(descriptives.Interface.totaltime$Interface=="B_Leap"),"sd"][[1]],
+  r12 = r_val,
+  low_eqbound_dz = -.3,
+  high_eqbound_dz = .3,
+  alpha = .05,
+  plot= TRUE,
+  verbose = TRUE
+)
+
 ```
 
 #### Accidental drops
 
-The HHI Leap data is skewed and not normally distributed. Therefore, a mean with a confidence interval is probably disingenuous. Will go with median instead.
 ```{r Interface_accidental drops, warning=FALSE}
 #temp_plot_data <- subject_data_all_long %>% group_by(Interface) %>% summarise(mean=mean(Drop_Rate), sd=sd(Drop_Rate), median=median(Drop_Rate), se=(sd/sqrt(sample_size)), IQR=IQR(Drop_Rate))
 
@@ -1807,17 +1870,17 @@ drops_raincloud <-  ggplot(subject_data_all_long, aes(Interface, Drop_Count, fil
     #geom_point(position = position_jitter(width = .1, height=.01), size = .25)+
     #geom_linerange(data=temp_plot_data, aes(x=Interface, y=NULL, ymin=q1, ymax=q3), color="black", size=1, position=position_nudge(x=.25))+ #IQR line
     #geom_label(data=temp_plot_data, aes(Interface, median, label=paste0(ceiling(median),"%")), color="white", position=position_nudge(.4), alpha=.9)+ # median label
-   geom_label(data=temp_plot_data, aes(Interface, y=mean, label=round(mean, 2)), color="white", position=position_nudge(.3), alpha=.9)+ # mean label
-    geom_dotplot(binaxis = "y", stackratio=1.4, binwidth = 1, stackdir="down", dotsize=.1, alpha=.8, position=position_nudge(x=0))+
-    geom_point(data = temp_plot_data, aes(x = Interface, y = mean, ymin=mean-(se*1.96), ymax=mean+(se*1.96)), position = position_nudge(.1), colour = "black")+
-    geom_errorbar(data = temp_plot_data, aes(x = Interface, y = mean, ymin=mean-(se*1.96), ymax=mean+(se*1.96)), position = position_nudge(.1), colour = "black", width = 0.025, size = 0.9)+ # mean error bar
+   geom_label(data=temp_plot_data, aes(Interface, y=mean, label=round(mean, 2)), color="white", position=position_nudge(.3), alpha=.9, size=8)+ # mean label
+    geom_dotplot(binaxis = "y", stackratio=1.3, binwidth = 1, stackdir="down", dotsize=.18, alpha=.8, position=position_nudge(x=.07))+
+    geom_point(data = temp_plot_data, aes(x = Interface, y = mean, ymin=mean-(se*1.96), ymax=mean+(se*1.96)), position = position_nudge(.1), colour = "black", size=3)+
+    geom_errorbar(data = temp_plot_data, aes(x = Interface, y = mean, ymin=mean-(se*1.96), ymax=mean+(se*1.96)), position = position_nudge(.1), colour = "black", width = 0.05, size = 1.2)+ # mean error bar
     # geom_errorbar(data = temp_plot_data, aes(x = Interface, y = mean, ymin=mean-(se*1.96), ymax=mean+(se*1.96)), position = position_nudge(0), width = 0.05, size = 0.5)+ #error bar on bar
-    ylab('Accidental Drops (of 30)')+xlab('Interface')+theme_cowplot()+guides(fill = FALSE, colour = FALSE, shape=TRUE) + #coord_flip()+
+    ylab('Accidental Drops (of 30)')+xlab('')+theme_cowplot()+guides(fill = FALSE, colour = FALSE, shape=TRUE) + #coord_flip()+
     scale_color_manual(values=mycolors)+#scale_colour_brewer(palette = "Set2")+
     scale_fill_manual(values=mycolors)+#scale_fill_brewer(palette = "Set2", direction=1)+
     #geom_text(data=temp_plot_data, aes(label=mean),hjust=-.2, vjust=.2)+
     labs(title="Accidental Drops")+
-    stat_pvalue_manual(data=stat.test %>% filter(p.adj < 0.05), xmin="group1", xmax="group2", label = "p.adj.signif", step.increase=.1, y.position=2.1*max(temp_plot_data$mean), position=position_nudge(.1), alpha = 1)+
+    stat_pvalue_manual(data=stat.test %>% filter(p.adj < 0.05), xmin="group1", xmax="group2", label = "p.adj.signif", step.increase=.1, y.position=1.85*max(temp_plot_data$mean), position=position_nudge(.1), alpha = 1, size=10, bracket.size = .5)+
   theme(plot.title = element_text(size=title_size), axis.title = element_text(size=axis_text_size), axis.text = element_text(size=axis_text_size*.75))
 drops_raincloud
   ggsave("accidental_drops_main.jpg", width=10, height=7)
@@ -2440,8 +2503,9 @@ descriptives.subjective5pt <- likert_scores %>%
               get_summary_stats(mean, type="common") %>%
               mutate(question="means", interface="means") %>%
               select(interface, question, n, mean, sd, median, iqr, min, max)
-            )
-descriptives.subjective5pt
+            ) %>%
+  mutate(SDs_from_mid = sd*(mean-3))
+#descriptives.subjective5pt
 
 descriptives.subjective7pt <- likert_scores %>% 
   filter(question == "agency" | question == "satisfaction") %>% 
@@ -2472,8 +2536,11 @@ descriptives.subjective7pt <- likert_scores %>%
               get_summary_stats(type="common") %>%
               get_summary_stats(mean, type="common") %>%
               mutate(question="means", interface="means") %>%
-              select(interface, question, n, mean, sd, median, iqr, min, max))
+              select(interface, question, n, mean, sd, median, iqr, min, max)) %>%
+ mutate(SDs_from_mid = sd*(mean-4))
 descriptives.subjective7pt
+
+
 
 # bar - 5 pt
 # need to redo with counts if I want to add the means
@@ -2495,7 +2562,7 @@ ggplot(likert_scores %>% group_by(Interface, question) %>% filter(question=="age
 
 # plot distributions - 5 point
 ggplot(likert_scores %>% filter(Interface != "Oculus", question != "agency" & question != "satisfaction"), aes(score, fill=Interface, alpha=Interface))+
-  geom_density()+ 
+  geom_density()+
   facet_grid(question ~ .)+
   scale_alpha_manual(values=c(1,.2))+
   theme_cowplot()+ scale_fill_manual(values=c("green3", "orange"))+
@@ -2503,7 +2570,7 @@ ggplot(likert_scores %>% filter(Interface != "Oculus", question != "agency" & qu
   labs(title="Distributions of scores on Likert questions (HHI Leap vs. B_Leap")+scale_y_continuous(labels=c())
 
 ggplot(likert_scores %>% filter(Interface != "B_Leap", question != "agency" & question != "satisfaction"), aes(score, fill=Interface, alpha=Interface))+
-  geom_density()+ 
+  geom_density()+
   facet_grid(question ~ .)+
   scale_alpha_manual(values=c(1,.2))+
   theme_cowplot()+ scale_fill_manual(values=c("green3","blue"))+
@@ -2511,7 +2578,7 @@ ggplot(likert_scores %>% filter(Interface != "B_Leap", question != "agency" & qu
   labs(title="Distributions of scores on Likert questions (HHI Leap vs. Oculus")+scale_y_continuous(labels=c())
 
 ggplot(likert_scores %>% filter(question != "agency" & question != "satisfaction"), aes(score, fill=Interface))+
-  geom_density()+ 
+  geom_density()+
   facet_grid(question ~ Interface)+ scale_fill_brewer(palette="Set2")+
   scale_alpha_manual(values=c(1,.2))+
   theme_cowplot()+
@@ -2520,7 +2587,7 @@ ggplot(likert_scores %>% filter(question != "agency" & question != "satisfaction
 
 # plot distributions - 7 pt
 ggplot(likert_scores %>% filter(Interface != "Oculus", question == "agency" | question == "satisfaction"), aes(score, fill=Interface, alpha=Interface))+
-  geom_density()+ 
+  geom_density()+
   facet_grid(question ~ .)+
   scale_alpha_manual(values=c(1,.2))+
   theme_cowplot()+ scale_fill_manual(values=c("green3", "orange"))+
@@ -2528,7 +2595,7 @@ ggplot(likert_scores %>% filter(Interface != "Oculus", question == "agency" | qu
   labs(title="Distributions of scores on Likert questions (HHI Leap vs. B_Leap")+scale_y_continuous(labels=c())
 
 ggplot(likert_scores %>% filter(Interface != "B_Leap", question == "agency" | question == "satisfaction"), aes(score, fill=Interface, alpha=Interface))+
-  geom_density()+ 
+  geom_density()+
   facet_grid(question ~ .)+
   scale_alpha_manual(values=c(1,.2))+
   theme_cowplot()+ scale_fill_manual(values=c("green3","blue"))+
@@ -2536,12 +2603,39 @@ ggplot(likert_scores %>% filter(Interface != "B_Leap", question == "agency" | qu
   labs(title="Distributions of scores on Likert questions (HHI Leap vs. Oculus")+scale_y_continuous(labels=c())
 
 ggplot(likert_scores %>% filter(question == "agency" | question == "satisfaction"), aes(score, fill=Interface))+
-  geom_density()+ 
+  geom_density()+
   facet_grid(question ~ Interface)+ scale_fill_brewer(palette="Set2")+
   scale_alpha_manual(values=c(1,.2))+
   theme_cowplot()+
   theme(strip.text.y = element_text(angle = 360))+#geom_histogram(bins=32)+
   labs(title="Distributions of scores on Likert questions (HHI Leap vs. B_Leap")+scale_y_continuous(labels=c())
+
+descriptives.subjective.all <-
+  bind_rows(descriptives.subjective5pt, descriptives.subjective7pt) %>%
+  filter(question != "all" & question != "means")
+descriptives.subjective.all
+
+# build df of mean and sd for t-test table
+ttest_questions <- c("comfortable", "precise", "gripping", "releasing", "recommend", "satisfaction")
+
+temp_df <- descriptives.subjective.all %>% filter(question %in% ttest_questions) %>%
+  rename(Measure=question)
+
+subjective_mean_sd <- data.frame(Measure=ttest_questions) %>%
+  left_join(temp_df %>% filter(interface=="HHI_Leap") %>% select(Measure, mean), by="Measure") %>%
+  rename(HHI_Leap_Mean=mean) %>%
+  left_join(temp_df %>% filter(interface=="HHI_Leap") %>% select(Measure, sd), by="Measure") %>%
+  rename(HHI_Leap_SD=sd) %>%
+  left_join(temp_df %>% filter(interface=="B_Leap") %>% select(Measure, mean), by="Measure") %>%
+  rename(B_Leap_Mean=mean) %>%
+  left_join(temp_df %>% filter(interface=="B_Leap") %>% select(Measure, sd), by="Measure") %>%
+  rename(B_Leap_SD=sd) %>%
+  left_join(temp_df %>% filter(interface=="Oculus") %>% select(Measure, mean), by="Measure") %>%
+  rename(Oculus_Mean=mean) %>%
+  left_join(temp_df %>% filter(interface=="Oculus") %>% select(Measure, sd), by="Measure") %>%
+  rename(Oculus_SD=sd)
+
+descriptives.subjective.all %>% filter(interface=="HHI_Leap") %>% select(interface, question, mean, sd, SDs_from_mid)
 
 ```
 
@@ -2552,6 +2646,7 @@ ggplot(likert_scores %>% filter(question == "agency" | question == "satisfaction
 # t tests likert q's: hhi_leap vs. oculus
 ttests.likert.oculus <- likert_scores %>%
   ungroup(.) %>% group_by(question) %>%
+  filter(question %in% c("comfortable","precise", "gripping", "releasing", "recommend", "satisfaction")) %>%
   t_test(score ~ Interface, paired=TRUE, comparisons = list(c("HHI_Leap","Oculus"))) %>%
   adjust_pvalue() %>% add_significance(p.col="p.adj", output.col="p.adj.signif", symbols=mysymbols)
 
@@ -2560,17 +2655,16 @@ ttests.likert.leap <- likert_scores %>%
   t_test(score ~ Interface, paired=TRUE, comparisons = list(c("HHI_Leap","B_Leap"))) %>%
   adjust_pvalue() %>% add_significance(p.col="p.adj", output.col="p.adj.signif", symbols=mysymbols) %>% mutate(group1="HHI_Leap", group2="B_Leap", statistic=-1*statistic)
 
-t.tests.likert.all.vs.hhi <- bind_rows(ttests.likert.oculus, ttests.likert.leap)
+#t.tests.likert.all.vs.hhi <- bind_rows(ttests.likert.oculus, ttests.likert.leap)
 
-sink("subjective_stats.csv")
-write.csv(t.tests.likert.all.vs.hhi)
-sink()
+#t tests all vs. hhi - only for measures flagged as significant by ANOVA
+ttests_subjective_all <- likert_scores %>%
+  ungroup(.) %>% filter(question %in% c("comfortable","precise", "gripping", "releasing", "recommend", "satisfaction")) %>% group_by(question) %>%
+  pairwise_t_test(score ~ Interface, paired=TRUE, ref.group="HHI_Leap") %>% add_significance(p.col="p.adj", output.col="p.adj.signif", symbols=mysymbols)
 
-# t tests all vs. hhi
-# t.tests.likert.all.vs.hhi <- likert_scores %>%
-#   ungroup(.) %>% group_by(question) %>%
-#   t_test(score ~ Interface, paired=TRUE, ref.group="HHI_Leap") %>%
-#   adjust_pvalue() %>% add_significance(p.col="p.adj", output.col="p.adj.signif", symbols=mysymbols) %>%
+# sink("subjective_stats.csv")
+# write.csv(t.tests.likert.all.vs.hhi)
+# sink()
 
 t.tests.likert.all.vs.hhi <- bind_rows(ttests.likert.oculus, ttests.likert.leap) %>%
   left_join(likert_scores %>% ungroup(.) %>% cohens_d(score ~ Interface, paired=TRUE, ref.group="HHI_Leap") %>% select(group1, group2, effsize, magnitude), by=c("group1", "group2")) %>%
@@ -2636,9 +2730,36 @@ anova.likert <-
   select(question, everything(.))
           
 
+
 ```
 
+#### Equivalence tests
 
+```{r equivalence_likert}
+
+# 
+r_val <- cor.test(
+  x = subject_data_all_long[which(subject_data_all_long$Interface=="HHI_Leap"),"totaltime"],
+  y = subject_data_all_long[which(subject_data_all_long$Interface=="B_Leap"),"totaltime"],
+  method = "pearson",
+  alternative = "two.sided"
+  )
+r_val <- r_val$estimate[[1]]
+
+TOSTpaired(n=32,
+  m1 = descriptives.Interface.totaltime[which(descriptives.Interface.totaltime$Interface=="HHI_Leap"),"mean"][[1]],
+  m2 = descriptives.Interface.totaltime[which(descriptives.Interface.totaltime$Interface=="B_Leap"),"mean"][[1]],
+  sd1 = descriptives.Interface.totaltime[which(descriptives.Interface.totaltime$Interface=="HHI_Leap"),"sd"][[1]],
+  sd2 = descriptives.Interface.totaltime[which(descriptives.Interface.totaltime$Interface=="B_Leap"),"sd"][[1]],
+  r12 = r_val,
+  low_eqbound_dz = -.3,
+  high_eqbound_dz = .3,
+  alpha = .05,
+  plot= TRUE,
+  verbose = TRUE
+)
+
+```
 
 #### Likert Plots
 
@@ -2680,20 +2801,20 @@ for (i in 1:nrow(subjective_means)){
 #   labs(title="Subjective Questionnaire Scores", y="Response (Mean)", x="")
 # ggsave("subjective_scores_new.jpg")
 
-ggplot(subjective_means %>% filter(question=="Agency"), aes(question, mean, color=Interface, fill=Interface))+
-  theme_minimal()+
-  geom_pointrange(aes(ymin=mean-ci, ymax=mean+ci), position=position_dodge(width=.5))+
-  #geom_bar(stat="identity", position="dodge", alpha=myalpha)+
-  #geom_errorbar(aes(ymin=mean-ci, ymax=mean+ci), position="dodge", show.legend = FALSE)+
-  scale_color_manual(values=mycolors)+#, guide_legend(title="Interface", reverse = FALSE))+
-  scale_fill_manual(values=mycolors)+#, guide_legend(title="Interface", reverse=FALSE))+
-  coord_flip()+
-  theme(legend.position="bottom", axis.text = element_text(size=likert_lab_size), plot.title = element_text(size=likert_title_size), axis.title = element_text(size=likert_lab_size))+
-  scale_y_continuous(limits=c(1,7), breaks=c(1:7))+
-  #theme(strip.text.y = element_text(angle=0))+
-  geom_hline(aes(yintercept = 4), linetype=2)+
-  labs(title="Subjective Questionnaire Scores", y="Response (Mean)", x="")
-ggsave("subjective_scores_agency_new.jpg")
+# ggplot(subjective_means %>% filter(question=="Agency"), aes(question, mean, color=Interface, fill=Interface))+
+#   theme_minimal()+
+#   geom_pointrange(aes(ymin=mean-ci, ymax=mean+ci), position=position_dodge(width=.5))+
+#   #geom_bar(stat="identity", position="dodge", alpha=myalpha)+
+#   #geom_errorbar(aes(ymin=mean-ci, ymax=mean+ci), position="dodge", show.legend = FALSE)+
+#   scale_color_manual(values=mycolors)+#, guide_legend(title="Interface", reverse = FALSE))+
+#   scale_fill_manual(values=mycolors)+#, guide_legend(title="Interface", reverse=FALSE))+
+#   coord_flip()+
+#   theme(legend.position="bottom", axis.text = element_text(size=likert_lab_size), plot.title = element_text(size=likert_title_size), axis.title = element_text(size=likert_lab_size))+
+#   scale_y_continuous(limits=c(1,7), breaks=c(1:7))+
+#   #theme(strip.text.y = element_text(angle=0))+
+#   geom_hline(aes(yintercept = 4), linetype=2)+
+#   labs(title="Subjective Questionnaire Scores", y="Response (Mean)", x="")
+# ggsave("subjective_scores_agency_new.jpg")
 
 # ggplot(subjective_means %>% filter(question=="Satisfaction"), aes(question, mean, color=Interface, fill=Interface))+
 #   theme_minimal()+
@@ -2731,7 +2852,9 @@ ggplot(subjective_means %>% mutate(question=fct_rev(question)) %>% filter(scale=
   scale_color_manual(values=mycolors, guide_legend(title="Interface", reverse = TRUE))+
   scale_fill_manual(values=mycolors, guide_legend(title="Interface", reverse=TRUE))+
   coord_flip()+
+  
   stat_pvalue_manual(data=t.tests.likert.all.vs.hhi %>% mutate(question=factor(question, levels=myquestions, labels=question_labels), p.adj=round(p.adj, 3), y.position=1.9) %>% filter(question != "Agency", question != "Satisfaction"), x="group1", label = "p.adj.signif", step.increase=.1, size=5)+#y.position=statistic
+  
   scale_y_continuous(breaks=c(-2:3), limits=(c(-2,2)))+#labels = c(-2,-1,0,1,2,3))+
   theme(legend.position = "left",  axis.text.y = element_blank(), axis.line.y=element_blank(), axis.ticks.y=element_blank(), strip.text.y = element_text(angle=0))+
   geom_hline(aes(yintercept = 0), linetype=2)+
@@ -2742,33 +2865,34 @@ ggsave("subjective_questions_new_bar.jpg")
 
 ggplot(subjective_means %>% filter(question=="Agency"), aes(Interface, converted_score, color=Interface, fill=Interface))+
   #theme_minimal()+
-  geom_bar(stat="identity", position="dodge", alpha=myalpha, width=.4)+
-  geom_errorbar(aes(ymin=converted_score-ci, ymax=converted_score+ci), position=position_dodge(width=.9), width=.1, show.legend = FALSE)+
+  geom_bar(stat="identity", alpha=myalpha)+
+  geom_errorbar(aes(ymin=converted_score-ci, ymax=converted_score+ci), width=.1, show.legend = FALSE)+
   scale_color_manual(values=mycolors, guide_legend(title="Interface", reverse = TRUE))+
   scale_fill_manual(values=mycolors, guide_legend(title="Interface", reverse=TRUE))+
   coord_flip()+
-  stat_pvalue_manual(data=t.tests.likert.all.vs.hhi %>% mutate(question=factor(question, levels=myquestions, labels=question_labels), p.adj=paste0("p(Holm) = ", round(p.adj, 3)), y.position=2.9) %>% filter(question == "Agency"), label = "p.adj", step.increase=.1, size=5)+#y.position=statistic
+  #stat_pvalue_manual(data=t.tests.likert.all.vs.hhi %>% mutate(question=factor(question, levels=myquestions, labels=question_labels), p.adj=paste0("p(Holm) = ", round(p.adj, 3)), y.position=2.9) %>% filter(question == "Agency"), label = "p.adj.signif", step.increase=.1, size=5)+#y.position=statistic
   scale_y_continuous(breaks=c(-3:3), limits=(c(-3,4)))+#labels = c(-2,-1,0,1,2,3))+
   theme(legend.position = "left",  axis.text.y = element_blank(), axis.line.y=element_blank(), axis.ticks.y=element_blank(), strip.text.y = element_text(angle=0))+
   geom_hline(aes(yintercept = 0), linetype=2)+
-  labs(title="Subjective Question Scores: Agency", y="Mean Likert-scale Rating", x=NULL)+
+  labs(title="Agency", y="Mean Likert-scale Rating", x=NULL)+
   guides(fill = guide_legend(reverse = TRUE), color=guide_legend(reverse=TRUE))#+facet_grid(question ~ .)
-ggsave("subjective_questions_new_bar_agency.jpg")
+ggsave("subjective_questions_new_bar_agency.jpg", height=2, width=7)
 
 ggplot(subjective_means %>% filter(question=="Satisfaction"), aes(Interface, converted_score, color=Interface, fill=Interface))+
   #theme_minimal()+
-  geom_bar(stat="identity", position="dodge", alpha=myalpha, width=.4)+
+  geom_bar(stat="identity", position="dodge", alpha=myalpha)+
   geom_errorbar(aes(ymin=converted_score-ci, ymax=converted_score+ci), position=position_dodge(width=.9), width=.1, show.legend = FALSE)+
   scale_color_manual(values=mycolors, guide_legend(title="Interface", reverse = TRUE))+
   scale_fill_manual(values=mycolors, guide_legend(title="Interface", reverse=TRUE))+
   coord_flip()+
-  stat_pvalue_manual(data=t.tests.likert.all.vs.hhi %>% mutate(question=factor(question, levels=myquestions, labels=question_labels), p.adj=paste0("p(Holm) = ",round(p.adj, 3)), y.position=2.9) %>% filter(question == "Satisfaction"), label = "p.adj", step.increase=.1, size=5)+#y.position=statistic
+  stat_pvalue_manual(data=t.tests.likert.all.vs.hhi %>% mutate(question=factor(question, levels=myquestions, labels=question_labels), y.position=2.5) %>% filter(question == "Satisfaction"), label = "p.adj.signif", step.increase=.1, size=5, remove.bracket=TRUE)+#y.position=statistic
   scale_y_continuous(breaks=c(-3:3), limits=(c(-3,4)))+#labels = c(-2,-1,0,1,2,3))+
   theme(legend.position = "left",  axis.text.y = element_blank(), axis.line.y=element_blank(), axis.ticks.y=element_blank(), strip.text.y = element_text(angle=0))+
   geom_hline(aes(yintercept = 0), linetype=2)+
-  labs(title="Subjective Question Scores: Overall Satisfaction", y="Mean Likert-scale Rating", x=NULL)+
+  labs(title="Overall Satisfaction", y="Mean Likert-scale Rating", x=NULL)+
   guides(fill = guide_legend(reverse = TRUE), color=guide_legend(reverse=TRUE))#+facet_grid(question ~ .)
-ggsave("subjective_questions_new_bar_satisfaction.jpg")
+ggsave("subjective_questions_new_bar_satisfaction.jpg", width=7, height=2)
+
 
 # pointrange version
 ggplot(subjective_means %>% mutate(question=fct_rev(question)) %>% filter(scale=="5pt"), aes(Interface, converted_score, color=Interface, fill=Interface))+
@@ -2794,7 +2918,7 @@ ggsave("subjective_questions_new_point.jpg")
 Dot plots, density distribution, means and CI's with a middle score indicated by a dotted line.
 Note: Using the R commind "adjust=" to smooth density plots (otherwise they would show divets in between points on the Likert scale). Adjustment is set by "mysmoothing" variable near the top of this code block.
 
-```{r subjective_plots_clouds}
+```{r subjective_plots_clouds, eval=FALSE}
 
 # plot configs (local)
 star_size=6
@@ -3222,9 +3346,9 @@ ggplot(diff_scores_vs_oculus %>% filter(question == "agency" | question == "sati
 
 Statistical test: Looks like the SUS scores are close enough to a normal distribution so that the means and medians are not radically different. While the Oculus data fails the shapiro test (probably due to its extreme outlier) and the data is generally very skewed, the mean and median are nearly the same. Therefore, we'll use the mean as the measure of central tendency for this data.
 
-The difference scores are normally distributed. Therefore, even though the dependent variable is not continuous, a T-Test seems appropriate. T-Tests have been found to be more robust than Wilcox tests, even when some assumptions are violated (Norman, 2010; Meed et al., 2010).
+The scores are normally distributed. Therefore, even though the dependent variable is not continuous, a T-Test seems appropriate. T-Tests have been found to be more robust than Wilcox tests, even when some assumptions are violated (Norman, 2010; Meed et al., 2010).
 
-As another analysis, we can use the guidelines offered by Bangor, Kortum and Miller (2009):
+We can use the guidelines offered by Bangor, Kortum and Miller (2009):
 <50: Not acceptable  
 50–70: Marginal
 >70: Acceptable
@@ -3273,21 +3397,23 @@ SUS_scoring_bins <- subject_data_all_long %>%
 # plot
 SUS_raincloud <- ggplot(subject_data_all_long, aes(x=Interface, y=SUS, fill=Interface, color=Interface))+
   geom_flat_violin(position = position_nudge(x = .25, y = 0), alpha=myalpha,adjust=mysmoothing)+
-  geom_dotplot(binaxis = "y", stackratio=1.4, binwidth = 1, position=position_nudge(x=.2), stackdir="down", dotsize=.6, alpha=.8)+
+  geom_dotplot(binaxis = "y", stackratio=1.4, binwidth = 1, position=position_nudge(x=.2), stackdir="down", dotsize=2, alpha=.8)+
   scale_color_manual(values=mycolors)+#scale_color_brewer(palette="Set2")+
   scale_fill_manual(values=mycolors)+#scale_fill_brewer(palette = "Set2")+#coord_flip()+
-  geom_point(data = temp_plot_data, aes(x = Interface, y = mean), position = position_nudge(.25), colour = "BLACK", size=2)+
-  geom_label(data = temp_plot_data, aes(x = Interface, y = mean, label=paste0("M = ",round(mean,1))), position = position_nudge(x=.45, y=-2), alpha=1, colour = "white", size=5)+ # mean label
-  geom_errorbar(data = temp_plot_data, aes(x = Interface, y = mean, ymin=mean-(se*1.96), ymax=mean+(se*1.96)), position = position_nudge(.25), colour = "BLACK", width = 0.05, size=1)+
-  ylab('SUS score')+xlab('')+theme_cowplot()+guides(fill = FALSE, colour = FALSE)+
-  labs(title="SUS scores")+
+  geom_point(data = temp_plot_data, aes(x = Interface, y = mean), position = position_nudge(.25), colour = "BLACK", size=4)+
+  geom_label(data = temp_plot_data, aes(x = Interface, y = mean, label=paste0("M = ",round(mean,1))), position = position_nudge(x=.5, y=-2), alpha=1, colour = "white", size=9, )+ # mean label
+  geom_errorbar(data = temp_plot_data, aes(x = Interface, y = mean, ymin=mean-(se*1.96), ymax=mean+(se*1.96)), position = position_nudge(.25), colour = "BLACK", width = 0.06, size=1.5)+
+  ylab('SUS score')+xlab('')+theme_cowplot()+guides(colour = FALSE, label = FALSE, text=FALSE)+
+  labs(title="SUS")+
   geom_hline(aes(yintercept=50), linetype=2, alpha=.5)+geom_hline(aes(yintercept=70), linetype=2, alpha=.5)+
-  geom_label(data=SUS_scoring_bins %>% filter(Interface=="B_Leap"), aes(x=.6, y=plot_pos, label=paste0(SUS_bin,":")), color="black", fill="white", alpha=1, size=5)+ # scoring bin name label
-  geom_label(data=SUS_scoring_bins, aes(x=Interface, y=plot_pos, label=n), alpha=.6, size=5, color="white")+ #scoring bin label #label=paste0(SUS_bin_percent,"%")),)+
-  stat_pvalue_manual(data=stat.test %>% filter(p.adj < 0.05), xmin="group1", xmax="group2", label = "p.adj.signif", step.increase=.1, y.position=1.05*max(subject_data_all_long$SUS), position=position_nudge(.25), size=5)+
-  theme(plot.title = element_text(size=title_size*1.25), axis.title = element_text(size=axis_text_size*1.25), axis.text=element_text(size=axis_text_size))
+  geom_label(data=SUS_scoring_bins %>% filter(Interface=="B_Leap"), aes(x=.7, y=plot_pos, label=SUS_bin), color="black", fill="white", alpha=1, size=9)+ # scoring bin name label
+  #geom_label(data=SUS_scoring_bins, aes(x=Interface, y=plot_pos, label=n), alpha=.6, size=9, color="white")+ #scoring bin label #label=paste0(SUS_bin_percent,"%")),)+
+  stat_pvalue_manual(data=stat.test %>% filter(p.adj < 0.05), xmin="group1", xmax="group2", label = "p.adj.signif", step.increase=.1, y.position=1.05*max(subject_data_all_long$SUS), position=position_nudge(.25), size=12, bracket.size=.5)+
+  theme(plot.title = element_text(size=title_size*1.25), axis.title = element_text(size=axis_text_size*1.5), axis.text=element_text(size=axis_text_size*1.5), legend.position = "none")#,  axis.text.x = element_blank())
+
+# export
 SUS_raincloud
-ggsave(last_plot(), filename = "SUS_plot.jpg", width=12, height=7)
+ggsave(last_plot(), filename = "SUS_plot.jpg", width=14, height=8)
 
 # are they normally distributed?
 #B_Leap: yes
@@ -3369,12 +3495,22 @@ SUS_scoring_bins %>% arrange(Interface)
 chi_counts <- SUS_scoring_bins %>% filter(Interface=="HHI_Leap")
 chi_expected <- SUS_scoring_bins %>% filter(Interface=="Oculus")
 chisq.test(chi_counts$n, chi_expected$SUS_bin_ratio)
-  
+
+# build df of mean and sd for HHI Leap
+SUS_mean_sd <- #left_join(get_summary_stats(temp_df, Distance,))
+  data.frame(Measure="SUS",
+      HHI_Leap_Mean = mean(subject_data_all_long[which(subject_data_all_long$Interface=="HHI_Leap"),"SUS"]),
+      HHI_Leap_SD = sd(subject_data_all_long[which(subject_data_all_long$Interface=="HHI_Leap"),"SUS"]),
+      B_Leap_Mean = mean(subject_data_all_long[which(subject_data_all_long$Interface=="B_Leap"),"SUS"]),
+      B_Leap_SD = sd(subject_data_all_long[which(subject_data_all_long$Interface=="HHI_Leap"),"SUS"]),
+      Oculus_Mean = mean(subject_data_all_long[which(subject_data_all_long$Interface=="Oculus"),"SUS"]),
+      Oculus_SD = sd(subject_data_all_long[which(subject_data_all_long$Interface=="Oculus"),"SUS"])) %>% mutate(Measure=as.character(Measure))
+
 ```  
 
 ### Plot compilation export
 
-```{r main_results_subjective}
+```{r main_results_subjective, eval=FALSE}
 
 # intuitive
 plot_grid(intuitive_raincloud, natural_raincloud, agency_raincloud)#, trainingtime_raincloud)
@@ -3406,6 +3542,13 @@ ggsave(last_plot(), filename = "SUS_plot.jpg", width=14, height=8)
 
 
 ## Post-hoc exploratory
+
+### Non-equivalence
+```{r equivalence}
+
+#TOSTpaired(32, m1, m2, sd1, sd2, r12, low_eqbound_dz, high_eqbound_dz, alpha, plot = TRUE, verbose = TRUE)
+
+```
 
 ### Time to learn
 
@@ -4959,61 +5102,148 @@ sink()
 
 ```{r output_anovas}
 # output all anovas in one place
-all_performance_anovas <- bind_rows(
+all_anovas <- bind_rows(
   anova.Interface.distance %>% mutate(Measure="Accuracy") %>% select(Measure, everything()),
   anova.Interface.totaltime %>% mutate(Measure="Total Time") %>% select(Measure, everything()),
   anova.Interface.grabtime %>% mutate(Measure="Grab Time") %>% select(Measure, everything()),
   anova.Interface.releasetime %>% mutate(Measure="Release Time") %>% select(Measure, everything()),
-  anova.Interface.drops %>% mutate(Measure="Accidental Drops") %>% select(Measure, everything())
-) %>% select(-`p<.05`) #%>% mutate(F=round(F,2))#, p="<.001")
+  anova.Interface.drops %>% mutate(Measure="Accidental Drops") %>% select(Measure, everything()),
+  anova.SUS %>% mutate(Measure="SUS") %>% select(Measure, everything()),
+  anova.likert %>% rename(Measure=question) %>% select(Measure, everything())
+) %>% select(-`p<.05`, -Effect) #%>% mutate(F=round(F,2))#, p="<.001")
 # then set p values to be "p < .001" (if true) and remove the *
-all_performance_anovas[which(all_performance_anovas$p<.0001),"p"] <- "p < .0001"
-all_performance_anovas
+all_anovas[which(all_anovas$p<.001),"p"] <- "p < .001"
+all_anovas
 sink("anova_data.csv")
-cat("ANOVA's: Performance Measures\n")
-write.csv(all_performance_anovas)
+cat("ANOVAs\n")
+write.csv(all_anovas)
 sink()
 
 # output table for LaTeX
-stargazer(all_performance_anovas, summary=FALSE, rownames = FALSE, title="ANOVA Results: Performance Measures")
+stargazer(all_anovas, summary=FALSE, rownames = FALSE, title="caption here")
 
 ```
 
-```{r t-test_results}
+```{r output_t-tests}
 
-Measure=c("Accuracy (Distance)","Total Time","Grab Time","Release Time","Accidental Drops")
+Measure=c("Accuracy (m)","Total Time (s)","Grab Time (s)","Release Time (s)","Accidental Drops (#)")
 
-# output all performance t-tests
-all_performance_ttests_oculus <- bind_rows(
-  subject_data_all_long %>% t_test(Distance ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE),
-  subject_data_all_long %>% t_test(totaltime ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE),
-  subject_data_all_long %>% t_test(grabtime ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE),
-  subject_data_all_long %>% t_test(releasetime ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE),
-  subject_data_all_long %>% t_test(Drop_Count ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE)
-) %>% adjust_pvalue(p.col="p", output.col="p.adj") %>% cbind(Measure) %>% select(Measure, t=statistic, df, p, `p(Holm)`=p.adj)
-all_performance_ttests_oculus
+# build df of mean and sd for HHI Leap performance metrics
+temp_df <- subject_data_all_long %>% ungroup() %>% filter(Interface=="HHI_Leap")
+hhi_leap_mean_sd <- #left_join(get_summary_stats(temp_df, Distance,))
+  data.frame(Measure=Measure,
+      HHI_Leap_Mean=c(mean(temp_df$Distance), mean(temp_df$totaltime), mean(temp_df$grabtime), mean(temp_df$releasetime), mean(temp_df$Drop_Count)),
+      HHI_Leap_SD=c(sd(temp_df$Distance), sd(temp_df$totaltime), sd(temp_df$grabtime), sd(temp_df$releasetime), sd(temp_df$Drop_Count))
+             )
+# build df of mean and sd for Oculus performance metrics
+temp_df <- subject_data_all_long %>% ungroup() %>% filter(Interface=="Oculus")
+oculus_mean_sd <-
+  data.frame(Measure=Measure,
+      Oculus_Mean=c(mean(temp_df$Distance), mean(temp_df$totaltime), mean(temp_df$grabtime), mean(temp_df$releasetime), mean(temp_df$Drop_Count)),
+      Oculus_SD=c(sd(temp_df$Distance), sd(temp_df$totaltime), sd(temp_df$grabtime), sd(temp_df$releasetime), sd(temp_df$Drop_Count))
+             )
+# combine hhi and oculus means and sd's
+hhi_leap_oculus_mean_sd <- left_join(hhi_leap_mean_sd, oculus_mean_sd)
 
-all_performance_ttests_leap <- bind_rows(
-  subject_data_all_long %>% t_test(Distance ~ Interface, comparisons = list(c("HHI_Leap","B_Leap")), paired = TRUE),
-  subject_data_all_long %>% t_test(totaltime ~ Interface, comparisons = list(c("HHI_Leap","B_Leap")), paired = TRUE),
-  subject_data_all_long %>% t_test(grabtime ~ Interface, comparisons = list(c("HHI_Leap","B_Leap")), paired = TRUE),
-  subject_data_all_long %>% t_test(releasetime ~ Interface, comparisons = list(c("HHI_Leap","B_Leap")), paired = TRUE),
-  subject_data_all_long %>% t_test(Drop_Count ~ Interface, comparisons = list(c("HHI_Leap","B_Leap")), paired = TRUE)
-) %>% adjust_pvalue(p.col="p", output.col="p.adj") %>% mutate(statistic=-1*statistic) %>% select(Measure=`.y.`, t=statistic, df, p, `p(Holm)`=p.adj)
-all_performance_ttests_leap
+# build df of mean and sd for HHI and b_leap performance metrics
+temp_df <- subject_data_all_long %>% ungroup() %>% filter(Interface=="B_Leap")
+b_leap_mean_sd <-
+  data.frame(Measure=Measure,
+      B_Leap_Mean=c(mean(temp_df$Distance), mean(temp_df$totaltime), mean(temp_df$grabtime), mean(temp_df$releasetime), mean(temp_df$Drop_Count)),
+      B_Leap_SD=c(sd(temp_df$Distance), sd(temp_df$totaltime), sd(temp_df$grabtime), sd(temp_df$releasetime), sd(temp_df$Drop_Count))
+             )
+# combine hhi_leap and b_leap performance metric means and sd's
+hhi_leap_b_leap_mean_sd <- left_join(hhi_leap_mean_sd, b_leap_mean_sd)
 
-# out put to file
-sink("ttest_data.csv")
-cat("t-tests: Performance Measures (HHI_Leap and Oculus)\n")
-write.csv(all_performance_ttests_oculus)
-cat("\nt-tests: Performance Measures (HHI_Leap and B_Leap)\n")
-write.csv(all_performance_ttests_leap)
-sink()
+# performance t test results (add "measure" column)
+all_ttests_interface <- bind_rows(
+  ttest.Interface.distance %>% mutate(Measure="Accuracy (m)"),
+  ttest.Interface.totaltime %>% mutate(Measure="Total Time (s)"),
+  ttest.Interface.grabtime %>% mutate(Measure = "Grab Time (s)"),
+  ttest.Interface.releasetime %>% mutate(Measure = "Release Time (s)"),
+  ttest.Interface.drops %>% mutate(Measure = "Accidental Drops (#)")
+)
 
-# output table for LaTeX
-stargazer(all_performance_ttests %>%
-            select(-p) %>%
-            mutate(`p(Holm)`=round(`p(Holm)`, 3), t=round(t, 3)), summary=FALSE, rownames = FALSE, title="ANOVA Results: Performance Measures")
+# build performance t-test table for HHI vs Oculus
+all_ttests_interface_hhiVsOculus <-
+  all_ttests_interface %>% filter(group2 == "Oculus") %>%
+  left_join(hhi_leap_oculus_mean_sd, by="Measure") %>%
+  select(Measure, HHI_Leap_Mean, HHI_Leap_SD, Oculus_Mean, Oculus_SD, t=statistic, df, `p(Holm)`=p.adj) %>%
+  # add SUS 
+  bind_rows(
+    left_join(SUS_mean_sd %>% select(Measure, HHI_Leap_Mean, HHI_Leap_SD,  Oculus_Mean, Oculus_SD),
+              ttest.SUS %>% filter(group2=="Oculus") %>% mutate(Measure=`.y.`) %>%
+                select(Measure, t=statistic, df, `p(Holm)`=p.adj), by="Measure")) %>%
+  # add subjective scores
+  bind_rows(
+    # combine means/sd's and t-test results
+    left_join(
+      subjective_mean_sd %>% select(Measure, HHI_Leap_Mean, HHI_Leap_SD, Oculus_Mean, Oculus_SD),
+      ttests_subjective_all %>% filter(group2=="Oculus") %>% rename(Measure=question) %>%
+        select(Measure, t=statistic, df, `p(Holm)`=p.adj), by="Measure")) %>%
+  # round numbers (rounds down)
+  mutate_if(is.numeric, round, 4)
+# change p =0 to p <.001
+all_ttests_interface_hhiVsOculus[which(all_ttests_interface_hhiVsOculus$`p(Holm)`<.001),"p(Holm)"] <- "p < .001"
+  
+# build performance t-test table for HHI vs B_Leap
+all_ttests_interface_hhiVsBLeap <-
+  all_ttests_interface %>% filter(group1== "B_Leap") %>%
+  left_join(hhi_leap_b_leap_mean_sd, by="Measure") %>%
+  select(Measure, HHI_Leap_Mean, HHI_Leap_SD, B_Leap_Mean, B_Leap_SD, t=statistic, df, `p(Holm)`=p.adj) %>%
+  mutate(t=-t) %>%
+    # add SUS 
+  bind_rows(
+    left_join(SUS_mean_sd %>% select(Measure, HHI_Leap_Mean, HHI_Leap_SD,  B_Leap_Mean, B_Leap_SD),
+              ttest.SUS %>% filter(group1=="B_Leap") %>% mutate(Measure=`.y.`) %>% 
+                select(Measure, t=statistic, df, `p(Holm)`=p.adj), by="Measure")) %>% # add subjective scores
+  bind_rows(
+    left_join(
+      subjective_mean_sd %>% select(Measure, HHI_Leap_Mean, HHI_Leap_SD,  B_Leap_Mean, B_Leap_SD),
+      ttests_subjective_all %>% filter(group2=="B_Leap") %>% mutate(Measure=question) %>%
+        select(Measure, t=statistic, df, `p(Holm)`=p.adj), by="Measure")
+  ) %>%
+  # round numbers (rounds down)
+  mutate_if(is.numeric, round, 4)
+# change p =0 to p <.001
+all_ttests_interface_hhiVsBLeap[which(all_ttests_interface_hhiVsBLeap$`p(Holm)`<.001),"p(Holm)"] <- "p < .001"
+
+stargazer(all_ttests_interface_hhiVsOculus, summary=FALSE, rownames = FALSE, title="caption")
+stargazer(all_ttests_interface_hhiVsBLeap, summary=FALSE, rownames = FALSE, title="caption")
+
+
+
+# # output all performance t-tests
+# all_performance_ttests_oculus <- bind_rows(
+#   subject_data_all_long %>% t_test(Distance ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE),
+#   subject_data_all_long %>% t_test(totaltime ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE),
+#   subject_data_all_long %>% t_test(grabtime ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE),
+#   subject_data_all_long %>% t_test(releasetime ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE),
+#   subject_data_all_long %>% t_test(Drop_Count ~ Interface, comparisons = list(c("HHI_Leap","Oculus")), paired = TRUE)
+# ) %>% adjust_pvalue(p.col="p", output.col="p.adj") %>% cbind(Measure) %>% select(Measure, t=statistic, df, p, `p(Holm)`=p.adj)
+# all_performance_ttests_oculus
+# 
+# all_performance_ttests_leap <- bind_rows(
+#   subject_data_all_long %>% t_test(Distance ~ Interface, comparisons = list(c("HHI_Leap","B_Leap")), paired = TRUE),
+#   subject_data_all_long %>% t_test(totaltime ~ Interface, comparisons = list(c("HHI_Leap","B_Leap")), paired = TRUE),
+#   subject_data_all_long %>% t_test(grabtime ~ Interface, comparisons = list(c("HHI_Leap","B_Leap")), paired = TRUE),
+#   subject_data_all_long %>% t_test(releasetime ~ Interface, comparisons = list(c("HHI_Leap","B_Leap")), paired = TRUE),
+#   subject_data_all_long %>% t_test(Drop_Count ~ Interface, comparisons = list(c("HHI_Leap","B_Leap")), paired = TRUE)
+# ) %>% adjust_pvalue(p.col="p", output.col="p.adj") %>% mutate(statistic=-1*statistic) %>% select(Measure=`.y.`, t=statistic, df, p, `p(Holm)`=p.adj)
+# all_performance_ttests_leap
+# 
+# # output to file
+# sink("ttest_stats.csv")
+# cat("t-tests: Performance Measures (HHI_Leap and Oculus)\n")
+# write.csv(all_performance_ttests_oculus)
+# cat("\nt-tests: Performance Measures (HHI_Leap and B_Leap)\n")
+# write.csv(all_performance_ttests_leap)
+# sink()
+
+# # output table for LaTeX
+# stargazer(all_performance_ttests %>%
+#             select(-p) %>%
+#             mutate(`p(Holm)`=round(`p(Holm)`, 3), t=round(t, 3)), summary=FALSE, rownames = FALSE, title="ANOVA Results: Performance Measures")
 
 ```
 
