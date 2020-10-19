@@ -827,18 +827,27 @@ Cut and add to accidental drop count:
 
 ```{r clean_unity_data}
 
-remove_subjects <- 99#remove_these_subjects #c(12, 30) # insert subject numbers seperated by commas here
+sink("accidental_drop_counts.txt")
+
+
+remove_subjects <- 99 #remove_these_subjects #c(12, 30) # insert subject numbers seperated by commas here
 include <- c(1:sample_size)
 include <- include[-remove_subjects] # this line removes subjects specified above
 
 # remove accidental drops and add to accidental drop count
 # data_set will contain all original drop counts; unity_data_clean will contain updated drops
+
+cat("Total original number of trials:", length(data_set[[1]]))
+
 temp_plot_data <- data_set
 
-accidental_drops_total <- length((data_set %>% filter(Drop==1))[[1]])
-accidental_drops_total
+accidental_drops_manual <- length((data_set %>% filter(Drop==1))[[1]])
+#accidental_drops_total
 
 accidental_drops_auto_detect <- 0 # to count accidental drops detected by the metric-based method
+
+cat("\n# accidental drops counted manually: ", accidental_drops_manual, "*")
+
 
 # tag above criteria as accidental drops
 for (x in 1:length(temp_plot_data$id)){
@@ -847,20 +856,27 @@ for (x in 1:length(temp_plot_data$id)){
       temp_plot_data$Drop[x]<-1
       accidental_drops_auto_detect <- accidental_drops_auto_detect+1
       }
-    if (temp_plot_data$Distance[x] >= 0.2){
+    else if (temp_plot_data$Distance[x] >= 0.2){
       temp_plot_data$Drop[x]<-1
       accidental_drops_auto_detect <- accidental_drops_auto_detect+1}
-    if (temp_plot_data$Distance[x] >= 0.1 & temp_plot_data$Distance[x]<0.2 & temp_plot_data$TimeFromGrabToGrabLoss[x] <= 0.5){
+    else if (temp_plot_data$Distance[x] >= 0.1 & temp_plot_data$Distance[x]<0.2 & temp_plot_data$TimeFromGrabToGrabLoss[x] <= 0.5){
       temp_plot_data$Drop[x]<-1
       accidental_drops_auto_detect <- accidental_drops_auto_detect+1}
   #}
 }
 
-# report how many were counted (including original manual detected drops)
-accidental_drops_auto_detect 
+cat("\n# accidental drops counted via auto-detect: ", accidental_drops_auto_detect, "*")
 
 accidental_drops_total <- length((temp_plot_data %>% filter(Drop==1))[[1]])
-accidental_drops_total
+
+cat("\n# accidental drops counted via auto-detect, not counted manually", accidental_drops_total - accidental_drops_manual,"*")
+
+cat("\n# accidental drops counted via by both auto-detect and manual methods", accidental_drops_manual + accidental_drops_auto_detect - accidental_drops_total,"*")
+
+cat("\n   * Note: these numbers don't mean much, except to compare with each other")
+
+
+cat("\n# total accidental drops (flagged by either method): ", accidental_drops_total)
 
 # unity_data_drops will serve as the data set from which drop counts will be derived.
 unity_data_drops <- temp_plot_data
@@ -881,6 +897,11 @@ sample_size <- length(survey_data$UserID)
 
 # total number of accidental drops
 accidental_drops_total <- length((unity_data_drops %>% filter(Drop==1))[[1]])
+cat("\n# total accidental drops according to unity_data_drops: ", accidental_drops_total)
+
+cat("\n# total number of trials remaining after cutting drops: ", length(unity_data_clean[[1]]))
+
+cat("\n% of original trials flagged and removed as accidental drops: ", round(100*(accidental_drops_total/length(data_set[[1]])), 2), "%")
 
 # count number of manually detected accidental drops
 accidental_drops_manual <- length((data_set %>% filter(Drop==1))[[1]])
@@ -894,6 +915,8 @@ accidental_drops_manual_only <- accidental_drops_total - accidental_drops_auto_d
 
 # auto, not manual-detected
 accidental_drops_auto_only <- accidental_drops_total - accidental_drops_manual
+
+sink()
 
 ```
 
@@ -5211,7 +5234,13 @@ all_ttests_interface_hhiVsBLeap[which(all_ttests_interface_hhiVsBLeap$`p(Holm)`<
 stargazer(all_ttests_interface_hhiVsOculus, summary=FALSE, rownames = FALSE, title="caption")
 stargazer(all_ttests_interface_hhiVsBLeap, summary=FALSE, rownames = FALSE, title="caption")
 
-
+# output to file
+sink("ttest_stats.csv")
+cat("t-tests: HHI_Leap vs Oculus\n")
+write.csv(all_ttests_interface_hhiVsOculus)
+cat("\nt-tests: HHI_Leap vs B_Leap\n")
+write.csv(all_ttests_interface_hhiVsBLeap)
+sink()
 
 # # output all performance t-tests
 # all_performance_ttests_oculus <- bind_rows(
